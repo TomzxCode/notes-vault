@@ -108,9 +108,12 @@ The log provides a full audit trail for all note access attempts.
 ## Storage Layout
 
 ```
-$VAULT_CONFIG_DIR/          (default: ~/.vault/)
-├── config.yaml             # YAML configuration
-└── index.db                # SQLite metadata index
+$XDG_CONFIG_HOME/notes-vault/     (default: ~/.config/notes-vault/)
+└── config.yaml                   # YAML configuration
+
+$XDG_DATA_HOME/notes-vault/       (default: ~/.local/share/notes-vault/)
+├── index.db                      # SQLite metadata index
+└── access.log                    # Access audit log
 ```
 
 The SQLite database is an implementation detail - do not edit it directly. Use `nv index` to rebuild it from the filesystem.

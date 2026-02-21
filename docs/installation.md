@@ -53,7 +53,8 @@ Notes Vault installs several command aliases:
 |---------|-------------|
 | `nv` | Full CLI (admin + user commands) |
 | `notes-vault` | Alias for `nv` |
-| `nva` | Alias for `nv` (admin emphasis) |
+| `nva` | Alias for `nv` |
+| `notes-vault-admin` | Alias for `nv` |
 | `nvu` | User-only CLI (`list`, `get`, `query` only) |
 | `notes-vault-user` | Alias for `nvu` |
 

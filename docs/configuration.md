@@ -2,13 +2,13 @@
 
 Notes Vault follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/latest/).
 
-**Config file** (`config.yaml`) and **log file** (`access.log`) are stored under:
+**Config file** (`config.yaml`) is stored under:
 
 ```
 $XDG_CONFIG_HOME/notes-vault/     # defaults to ~/.config/notes-vault/
 ```
 
-**Database** (`index.db`) is stored under:
+**Database** (`index.db`) and **log file** (`access.log`) are stored under:
 
 ```
 $XDG_DATA_HOME/notes-vault/       # defaults to ~/.local/share/notes-vault/

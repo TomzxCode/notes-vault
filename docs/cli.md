@@ -150,7 +150,7 @@ nv keys add work_key --sensitivities work,public
 
 ### `nv keys list`
 
-List all API keys (names and hashes, not raw values).
+List all API keys (names and assigned sensitivities, not raw values).
 
 ```bash
 nv keys list
@@ -244,14 +244,14 @@ nv sensitivities delete <name>
 Add an include relationship between two sensitivity levels. After this, a key with access to `<name>` will also be able to access notes at `<other-level>`.
 
 ```bash
-nv sensitivities include <name> --include <other-level>
+nv sensitivities include <name> --include-level <other-level>
 ```
 
 **Example:**
 
 ```bash
 # private includes work (private key can see work notes)
-nv sensitivities include private --include work
+nv sensitivities include private --include-level work
 ```
 
 ---
@@ -265,16 +265,16 @@ These commands are also available via the `nvu` / `notes-vault-user` entry point
 List notes accessible to the given API key.
 
 ```bash
-nv list --api-key <raw-key>
+nv list --key <raw-key>
 ```
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `--api-key KEY` | Raw API key value |
+| `--key KEY` | Raw API key value (or set `NOTES_VAULT_KEY` env var) |
 
-Output columns: UUID, sensitivity, file group, file path.
+Output columns: UUID, sensitivity, file group.
 
 ---
 
@@ -283,7 +283,7 @@ Output columns: UUID, sensitivity, file group, file path.
 Print the content of a note to stdout.
 
 ```bash
-nv get --api-key <raw-key> <uuid>
+nv get --key <raw-key> <uuid>
 ```
 
 **Arguments:**
@@ -296,7 +296,7 @@ nv get --api-key <raw-key> <uuid>
 
 | Option | Description |
 |--------|-------------|
-| `--api-key KEY` | Raw API key value |
+| `--key KEY` | Raw API key value (or set `NOTES_VAULT_KEY` env var) |
 
 ---
 
@@ -305,7 +305,7 @@ nv get --api-key <raw-key> <uuid>
 Search note content using ripgrep. Only searches notes accessible to the given key.
 
 ```bash
-nv query --api-key <raw-key> <search-string> [options]
+nv query --key <raw-key> <search-string> [options]
 ```
 
 **Arguments:**
@@ -318,21 +318,21 @@ nv query --api-key <raw-key> <search-string> [options]
 
 | Option | Description |
 |--------|-------------|
-| `--api-key KEY` | Raw API key value |
+| `--key KEY` | Raw API key value (or set `NOTES_VAULT_KEY` env var) |
 | `--case-sensitive` | Enable case-sensitive matching (default: case-insensitive) |
-| `--files-only` | Return only UUIDs of matching notes, not content |
+| `--with-context` | Show match details and line content (default: print only UUIDs) |
 
 **Examples:**
 
 ```bash
-# Search for "meeting" in accessible notes
-nv query --api-key mykey "meeting"
+# Search for "meeting" in accessible notes (prints matching UUIDs)
+nv query --key mykey "meeting"
 
 # Case-sensitive search
-nv query --api-key mykey "TODO" --case-sensitive
+nv query --key mykey "TODO" --case-sensitive
 
-# Return only UUIDs of matching notes
-nv query --api-key mykey "project alpha" --files-only
+# Show match details including line content
+nv query --key mykey "project alpha" --with-context
 ```
 
 !!! note

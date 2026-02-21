@@ -41,7 +41,7 @@ Notes (markdown files)
 # Set up sensitivity levels
 nv sensitivities add private --description "Private notes" --query "#private"
 nv sensitivities add public --description "Public notes" --query "#public"
-nv sensitivities include private --include public
+nv sensitivities include private --include-level public
 
 # Add your notes directory
 nv files add mynotes --path "~/notes/**/*.md" --sensitivity private
@@ -51,7 +51,7 @@ nv keys add mykey --sensitivities private
 
 # Index and list notes
 nv index
-nv list --api-key mykey
+nv list --key mykey
 ```
 
 ## Next Steps

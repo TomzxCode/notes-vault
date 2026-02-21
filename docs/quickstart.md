@@ -18,9 +18,9 @@ nv sensitivities add public --description "Public notes" --query "#public"
 Configure which levels grant access to which other levels. Here, a key with `private` access can also see `work` and `public` notes.
 
 ```bash
-nv sensitivities include private --include work
-nv sensitivities include private --include public
-nv sensitivities include work --include public
+nv sensitivities include private --include-level work
+nv sensitivities include private --include-level public
+nv sensitivities include work --include-level public
 ```
 
 ## Step 2: Set a Default Sensitivity
@@ -73,13 +73,13 @@ Indexing is incremental: subsequent runs only re-scan files that have changed.
 
 ```bash
 # List notes accessible to a key
-nv list --api-key <raw-key-value>
+nv list --key <raw-key-value>
 
 # Get the content of a specific note by its UUID
-nv get --api-key <raw-key-value> <uuid>
+nv get --key <raw-key-value> <uuid>
 
 # Search notes for a string
-nv query --api-key <raw-key-value> "meeting notes"
+nv query --key <raw-key-value> "meeting notes"
 ```
 
 ## Example Note
