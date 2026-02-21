@@ -272,7 +272,7 @@ nv list --key <raw-key>
 
 | Option | Description |
 |--------|-------------|
-| `--key KEY` | Raw API key value (or set `NOTES_VAULT_KEY` env var) |
+| `--key KEY` | Raw API key value (or set `NOTES_VAULT_KEY` env var instead) |
 
 Output columns: UUID, sensitivity, file group.
 
@@ -302,7 +302,7 @@ nv get --key <raw-key> <uuid>
 
 ### `nv query`
 
-Search note content using ripgrep. Only searches notes accessible to the given key.
+Search note content using SQLite FTS5. Only searches notes accessible to the given key.
 
 ```bash
 nv query --key <raw-key> <search-string> [options]
@@ -334,6 +334,3 @@ nv query --key mykey "TODO" --case-sensitive
 # Show match details including line content
 nv query --key mykey "project alpha" --with-context
 ```
-
-!!! note
-    `nv query` requires `ripgrep` (`rg`) to be installed. See [Installation](installation.md).

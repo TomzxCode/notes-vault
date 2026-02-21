@@ -46,7 +46,7 @@ def index_file(
     file_group_sensitivity: str,
     config: Config,
     existing_note: NoteMetadata | None,
-) -> NoteMetadata | None:
+) -> tuple[NoteMetadata, str] | None:
     """
     Index a single file.
 
@@ -58,7 +58,7 @@ def index_file(
         existing_note: Existing note metadata from database, if any
 
     Returns:
-        NoteMetadata if indexed successfully, None on read error
+        (NoteMetadata, content) tuple if indexed successfully, None on read error
     """
     try:
         content = file_path.read_text(encoding="utf-8")
@@ -91,7 +91,7 @@ def index_file(
         uuid=str(note_uuid),
         effective_sensitivity=effective,
     )
-    return note
+    return note, content
 
 
 def _collect_files(
@@ -135,7 +135,7 @@ def index_all(
 
     stats = {"indexed": 0, "skipped": 0, "errors": 0}
     indexed_paths: set[str] = set()
-    notes_to_upsert: list[NoteMetadata] = []
+    notes_to_upsert: list[tuple[NoteMetadata, str]] = []
 
     # Load all existing notes upfront (one DB query instead of one per file)
     existing_notes = {n.file_path: n for n in list_notes()}
@@ -153,13 +153,13 @@ def index_all(
 
         try:
             if should_reindex(file_path, existing_note):
-                note = index_file(
+                result = index_file(
                     file_path, file_group_name, file_group_sensitivity, config, existing_note
                 )
-                if note is None:
+                if result is None:
                     stats["errors"] += 1
                 else:
-                    notes_to_upsert.append(note)
+                    notes_to_upsert.append(result)
                     stats["indexed"] += 1
             else:
                 stats["skipped"] += 1

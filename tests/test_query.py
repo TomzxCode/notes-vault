@@ -1,7 +1,5 @@
 """Tests for query command."""
 
-from unittest.mock import MagicMock, patch
-
 from notes_vault.commands.user import query
 from notes_vault.config import save_config
 from notes_vault.indexer import index_all
@@ -15,16 +13,7 @@ def test_query_finds_matches(temp_config_dir, temp_notes_dir, sample_config, cap
     save_config(sample_config)
     index_all()
 
-    # Mock ripgrep output
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = (
-        '{"type":"match","data":{"path":{"text":"/tmp/private.md"},'
-        '"line_number":1,"lines":{"text":"This is #private content"}}}\n'
-    )
-
-    with patch("subprocess.run", return_value=mock_result):
-        query(TEST_RAW_KEYS["admin_key"], "private", False, with_context=True)
+    query("private", TEST_RAW_KEYS["admin_key"], case_sensitive=False, with_context=True)
 
     captured = capsys.readouterr()
     assert "Found" in captured.out
@@ -37,13 +26,7 @@ def test_query_no_matches(temp_config_dir, temp_notes_dir, sample_config, capsys
     save_config(sample_config)
     index_all()
 
-    # Mock ripgrep with no matches (exit code 1)
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-
-    with patch("subprocess.run", return_value=mock_result):
-        query(TEST_RAW_KEYS["admin_key"], "nonexistent_string_xyz", False)
+    query("nonexistent_string_xyz", TEST_RAW_KEYS["admin_key"])
 
     captured = capsys.readouterr()
     assert "No matches found" in captured.out
@@ -55,13 +38,8 @@ def test_query_case_sensitive(temp_config_dir, temp_notes_dir, sample_config, ca
     save_config(sample_config)
     index_all()
 
-    # Mock ripgrep with no matches for case-sensitive search
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-
-    with patch("subprocess.run", return_value=mock_result):
-        query(TEST_RAW_KEYS["admin_key"], "PRIVATE", True)
+    # "PRIVATE" (uppercase) should not match "#private" (lowercase) in case-sensitive mode
+    query("PRIVATE", TEST_RAW_KEYS["admin_key"], case_sensitive=True)
 
     captured = capsys.readouterr()
     assert "No matches found" in captured.out
@@ -73,55 +51,24 @@ def test_query_respects_access_control(temp_config_dir, temp_notes_dir, sample_c
     save_config(sample_config)
     index_all()
 
-    # Mock ripgrep with matches
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = (
-        '{"type":"match","data":{"path":{"text":"/tmp/public.md"},'
-        '"line_number":1,"lines":{"text":"This is #public content"}}}\n'
-    )
-
-    with patch("subprocess.run", return_value=mock_result):
-        query(TEST_RAW_KEYS["public_key"], "content", False)
+    # public_key only has access to "public" sensitivity notes
+    query("private", TEST_RAW_KEYS["public_key"])
 
     captured = capsys.readouterr()
-    # Should find matches or show no accessible notes
-    assert "Found" in captured.out or "No matches" in captured.out or "accessible" in captured.out
-
-
-def test_query_ripgrep_not_found(temp_config_dir, temp_notes_dir, sample_config, capsys):
-    """Test query command when ripgrep is not installed."""
-    init_db()
-    save_config(sample_config)
-    index_all()
-
-    # Mock FileNotFoundError when ripgrep is not available
-    with patch("subprocess.run", side_effect=FileNotFoundError()):
-        query(TEST_RAW_KEYS["admin_key"], "test", False)
-
-    captured = capsys.readouterr()
-    assert "ripgrep (rg) not found" in captured.out
+    # Should not find private notes via a public key
+    assert "Found" not in captured.out or "No matches" in captured.out
 
 
 def test_query_files_only(temp_config_dir, temp_notes_dir, sample_config, capsys):
-    """Test query command defaults to files-only output."""
+    """Test query command defaults to UUID-only output."""
     init_db()
     save_config(sample_config)
     index_all()
 
-    # Mock ripgrep output
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = (
-        '{"type":"match","data":{"path":{"text":"/tmp/private.md"},'
-        '"line_number":1,"lines":{"text":"This is #private content"}}}\n'
-    )
-
-    with patch("subprocess.run", return_value=mock_result):
-        query(TEST_RAW_KEYS["admin_key"], "private", False)
+    query("private", TEST_RAW_KEYS["admin_key"])
 
     captured = capsys.readouterr()
-    # Should only contain UUID, not "Found" or other details
+    # Should only contain UUID, not detailed context fields
     assert "Found" not in captured.out
     assert "Sensitivity:" not in captured.out
     assert "Line" not in captured.out

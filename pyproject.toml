@@ -23,6 +23,7 @@ nvu = "notes_vault.cli:main_user"
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pytest-xdist>=3.6.1",
     "ruff>=0.15.0",
     {include-group = "docs"},
 ]
@@ -45,6 +46,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+addopts = "-nauto"
 
 [tool.uv]
 package = true

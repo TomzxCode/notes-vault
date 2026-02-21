@@ -32,6 +32,7 @@ Indexing discovers note files on disk, extracts sensitivity metadata, and persis
 - The system MUST compute a SHA-256 hash of each file's content and store it in the index.
 - The system MUST detect sensitivity levels for each file by running the sensitivity detection algorithm against its full content.
 - The system MUST store the detected sensitivities (set), effective sensitivity (single value), file group name, and file path alongside the UUID and content hash.
+- The system MUST store the full text content of each note in the index to support full-text search.
 - The system MUST record the file's modification time at the time of indexing.
 
 ### Deletion Handling
@@ -78,7 +79,7 @@ NoteMetadata:
    d. Run sensitivity detection to get detected sensitivities and effective sensitivity.
    e. Assign or reuse UUID.
    f. Create/update `NoteMetadata`.
-4. Batch-upsert all new/updated records to the SQLite index.
+4. Batch-upsert all new/updated records (metadata + content) to the SQLite index.
 5. Delete index entries for paths no longer present in the glob expansion.
 6. Return statistics: `{indexed: int, skipped: int, errors: int}`.
 

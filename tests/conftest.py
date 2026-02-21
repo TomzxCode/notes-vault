@@ -18,11 +18,19 @@ def temp_dir():
 
 
 @pytest.fixture
-def temp_config_dir(temp_dir, monkeypatch):
+def temp_config_dir(temp_dir, monkeypatch, worker_id="master"):
     """Set up a temporary config directory."""
     config_dir = temp_dir / ".vault"
     config_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr("notes_vault.config.get_config_dir", lambda: config_dir)
+
+    # Also patch get_data_dir to use worker-specific path for xdist isolation
+    data_dir = temp_dir / ".data"
+    if worker_id != "master":
+        data_dir = temp_dir / f".data_{worker_id}"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr("notes_vault.config.get_data_dir", lambda: data_dir)
+
     return config_dir
 
 

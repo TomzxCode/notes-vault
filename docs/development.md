@@ -101,10 +101,11 @@ Loads and saves `config.yaml` using PyYAML. The config directory is resolved via
 
 ### Storage (`storage.py`)
 
-Wraps a SQLite database for note metadata. Provides:
+Wraps a SQLite database for note metadata and content. Provides:
 
-- `upsert_note` - insert or update note metadata
-- `get_notes` - query notes by sensitivity
+- `upsert_note` / `upsert_notes_batch` - insert or update note metadata and content
+- `list_notes` - query notes, optionally filtered by sensitivity
+- `search_notes_fts` - full-text search using FTS5 (case-insensitive) or `INSTR` (case-sensitive)
 - `log_access` - write access log entries
 
 ### Sensitivity (`sensitivity.py`)
@@ -115,9 +116,9 @@ Wraps a SQLite database for note metadata. Provides:
 
 ### Indexer (`indexer.py`)
 
-- `index_file_group` - glob-expands a group's path, checks mtimes, scans changed files
-- `generate_uuid` - deterministic UUID from content hash
-- `compute_hash` - SHA-256 of file content
+- `index_all` - discovers all files, checks mtimes, scans changed files, batch-upserts to SQLite
+- `index_file` - indexes a single file: reads content, detects sensitivity, creates `NoteMetadata`
+- `calculate_content_hash` - SHA-256 of file content
 
 ### Access Control (`access_control.py`)
 
@@ -153,8 +154,6 @@ Each module registers its commands with the Cyclopts app:
 | `structlog` | Structured logging |
 
 Dev dependencies: `pytest`, `ruff`
-
-External: `ripgrep` (system package, required for `nv query`)
 
 ## CI
 

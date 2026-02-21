@@ -13,7 +13,8 @@ Notes Vault (`nv`) lets you organize your markdown notes into sensitivity levels
 - **Hierarchical access** - Sensitivity levels can include other levels (e.g., `private` also grants access to `work` and `public` notes)
 - **File group management** - Organize notes using glob patterns
 - **Incremental indexing** - Only re-scans files that have changed since the last index
-- **SQLite metadata store** - Fast querying of note metadata without reading file contents
+- **Full-text search** - SQLite FTS5-powered search across accessible notes, no external tools required
+- **SQLite store** - Note metadata and content indexed for fast querying and search
 - **YAML configuration** - Human-readable, editable configuration
 - **Access logging** - Audit trail of all access attempts
 

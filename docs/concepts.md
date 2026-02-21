@@ -70,24 +70,34 @@ A note is accessible to a key if the note's effective sensitivity is within the 
 
 ## Indexing
 
-The index is a SQLite database that stores metadata about each note. Indexing:
+The index is a SQLite database that stores metadata and content for each note. Indexing:
 
 1. Discovers files matching each file group's glob pattern
 2. Checks modification times - only re-processes files that have changed
 3. Reads each changed file and runs sensitivity detection
-4. Assigns a UUID to each note (stable across renames within a group)
-5. Stores metadata: UUID, file path, file group, detected sensitivities, effective sensitivity, content hash, timestamps
+4. Assigns a UUID to each note (stable across re-indexing)
+5. Stores metadata and full content: UUID, file path, file group, detected sensitivities, effective sensitivity, content hash, timestamps, note text
 
 ### Why UUIDs?
 
 Notes are identified by UUID rather than file path. This provides:
 
 - **Privacy** - the `nv list` output shows UUIDs, not paths, so consumers don't see the underlying directory structure
-- **Stability** - if you rename a note file, its UUID is recalculated from content, preserving identity
+- **Stability** - if you rename a note file, its UUID is preserved on re-index
 
 ### Incremental Indexing
 
-The indexer compares the current file modification time against what was recorded last time. Only changed files are re-scanned. This makes subsequent `nv index` calls fast even for large note collections.
+The indexer collects all matching files first, then compares modification times against what was recorded last time. Only changed files are re-read and re-indexed. This makes subsequent `nv index` calls fast even for large note collections.
+
+---
+
+## Full-Text Search
+
+`nv query` searches note content using SQLite FTS5. No external tools are required. The FTS5 index is kept in sync with the notes table automatically during indexing.
+
+- **Case-insensitive** (default): uses FTS5 phrase matching
+- **Case-sensitive** (`--case-sensitive`): uses SQLite `INSTR` for exact substring matching
+- Results are always filtered to notes accessible to the provided API key
 
 ---
 

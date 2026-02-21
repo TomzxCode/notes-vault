@@ -10,15 +10,25 @@ Notes Vault uses a SQLite database as the metadata index for indexed notes and a
 
 - The system MUST create the SQLite database file and required tables on first use if they do not exist.
 - The system MUST use `IF NOT EXISTS` semantics for table creation to allow safe re-initialization.
+- The system MUST migrate existing databases lacking the `content` column by running `ALTER TABLE notes ADD COLUMN content TEXT`.
 
 ### Notes Table
 
 - The system MUST store one row per note, keyed by UUID.
-- The system MUST store the following fields per note: `uuid`, `file_path`, `file_group`, `detected_sensitivities`, `effective_sensitivity`, `content_hash`, `indexed_at`, `file_mtime`.
-- The system MUST serialize `detected_sensitivities` (a set) as a comma-separated string for storage.
+- The system MUST store the following fields per note: `uuid`, `file_path`, `file_group`, `detected_sensitivities`, `effective_sensitivity`, `content_hash`, `last_indexed`, `last_modified`, `content`.
+- The system MUST serialize `detected_sensitivities` (a set) as a JSON array for storage.
 - The system MUST deserialize `detected_sensitivities` back into a set on read.
-- The system MUST use `INSERT OR REPLACE` (upsert) semantics when writing note records.
+- The system MUST store the full text content of each note to support full-text search.
+- The system MUST use upsert semantics (`INSERT ... ON CONFLICT DO UPDATE`) when writing note records.
 - The system MUST support batch upsert of multiple notes in a single transaction for efficiency.
+
+### Full-Text Search
+
+- The system MUST maintain a standalone FTS5 virtual table (`notes_fts`) for full-text search over note content.
+- The system MUST keep `notes_fts` in sync with the `notes` table by updating it on every upsert and delete.
+- The system MUST use FTS5 phrase matching for case-insensitive search.
+- The system MUST use SQLite `INSTR` for case-sensitive search.
+- The system MUST filter search results to a specified set of effective sensitivity values.
 
 ### Querying Notes
 
@@ -29,8 +39,8 @@ Notes Vault uses a SQLite database as the metadata index for indexed notes and a
 
 ### Deletion
 
-- The system MUST support deleting a single note by file path.
-- The system MUST support clearing all notes from the database (used for full re-index).
+- The system MUST support deleting a single note by file path, including its FTS5 entry.
+- The system MUST support clearing all notes from the database, including the FTS5 table.
 
 ### Access Log Table
 
@@ -48,22 +58,27 @@ Notes Vault uses a SQLite database as the metadata index for indexed notes and a
 ```sql
 CREATE TABLE IF NOT EXISTS notes (
     uuid TEXT PRIMARY KEY,
-    file_path TEXT NOT NULL,
+    file_path TEXT NOT NULL UNIQUE,
     file_group TEXT NOT NULL,
-    detected_sensitivities TEXT NOT NULL,  -- comma-separated
+    detected_sensitivities TEXT,       -- JSON array
     effective_sensitivity TEXT NOT NULL,
-    content_hash TEXT NOT NULL,
-    indexed_at TEXT NOT NULL,              -- ISO 8601 datetime
-    file_mtime REAL NOT NULL               -- Unix timestamp
+    last_modified TIMESTAMP,
+    last_indexed TIMESTAMP,
+    content_hash TEXT,
+    content TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_effective_sensitivity ON notes(effective_sensitivity);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(content);
 
 CREATE TABLE IF NOT EXISTS access_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,               -- ISO 8601 datetime
-    api_key TEXT NOT NULL,
-    action TEXT NOT NULL,
-    note_uuid TEXT,                        -- nullable
-    granted INTEGER NOT NULL               -- 0 or 1
+    timestamp TIMESTAMP,
+    api_key TEXT,
+    action TEXT,
+    note_uuid TEXT,                    -- nullable
+    granted BOOLEAN
 );
 ```
 
@@ -71,16 +86,17 @@ CREATE TABLE IF NOT EXISTS access_log (
 
 | Operation | Description |
 |-----------|-------------|
-| `init_db()` | Create tables if not present |
-| `upsert_note(note)` | Insert or replace a single note record |
-| `upsert_notes_batch(notes)` | Insert or replace multiple notes in one transaction |
+| `init_db()` | Create tables if not present; migrate existing schema |
+| `upsert_note(note, content)` | Insert or update a single note record and its FTS5 entry |
+| `upsert_notes_batch(notes)` | Insert or update multiple notes in one transaction |
 | `get_note_by_uuid(uuid)` | Return `NoteMetadata` or `None` |
 | `get_note_by_path(path)` | Return `NoteMetadata` or `None` |
-| `list_notes(sensitivities?)` | Return list of `NoteMetadata`, optionally filtered |
-| `delete_note_by_path(path)` | Remove note record by file path |
-| `clear_all_notes()` | Remove all note records |
+| `list_notes(sensitivities?)` | Return list of `NoteMetadata`, optionally filtered by sensitivity |
+| `search_notes_fts(query, sensitivities?, case_sensitive?)` | Full-text search returning `(NoteMetadata, [(line_num, line_text)])` tuples |
+| `delete_note_by_path(path)` | Remove note record and FTS5 entry by file path |
+| `clear_all_notes()` | Remove all note records and FTS5 entries |
 | `log_access(entry)` | Append an access log entry |
 
 ## Notes on Serialization
 
-`detected_sensitivities` is stored as a comma-separated string (e.g., `"private,work"`) because SQLite has no native set type. An empty set is stored as an empty string `""`. On read, the string is split on `,` and converted to a `set[str]`, with the empty string case returning an empty set.
+`detected_sensitivities` is stored as a JSON array (e.g., `'["private", "work"]'`). On read, the string is parsed back to a `set[str]`.

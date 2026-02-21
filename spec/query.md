@@ -2,37 +2,34 @@
 
 ## Overview
 
-The `query` command performs full-text search across notes accessible to an API key. It delegates the actual text search to `ripgrep` (`rg`), passing only the file paths the key is permitted to access. Results are returned with match context or as a list of UUIDs.
+The `query` command performs full-text search across notes accessible to an API key. Search is executed against content stored in the SQLite index using FTS5 (case-insensitive) or `INSTR` (case-sensitive). Results are returned with match context or as a plain list of UUIDs.
 
 ## Requirements
 
 ### Access Enforcement
 
-- The system MUST only search files that the requesting API key has permission to access.
-- The system MUST resolve accessible files by running access control checks before invoking ripgrep.
-- The system MUST NOT pass inaccessible file paths to ripgrep.
+- The system MUST only search notes that the requesting API key has permission to access.
+- The system MUST resolve accessible notes by running access control checks before searching.
+- The system MUST filter FTS results to only those notes whose effective sensitivity is within the key's expanded access set.
 
 ### Search Execution
 
-- The system MUST use `ripgrep` (`rg`) as the search backend.
-- The system MUST require `ripgrep` to be installed on the system; the command MUST fail with a clear error if `rg` is not found.
-- The system MUST invoke ripgrep with `--json` output format to parse results programmatically.
-- The system MUST pass the list of accessible file paths directly to ripgrep rather than directory paths, to ensure access control is respected.
+- The system MUST use SQLite FTS5 for case-insensitive search.
+- The system MUST use SQLite `INSTR` for case-sensitive search.
 - The system MUST perform case-insensitive search by default.
 - The system MUST support case-sensitive search via the `--case-sensitive` flag.
+- The system MUST NOT require any external tools (e.g., ripgrep) to execute a query.
 
 ### Output
 
-- By default, the system MUST output matching lines with their source note UUID and line number.
-- When `--files-only` is specified, the system MUST output only the UUIDs of notes that contain at least one match, with no line content.
-- The system MUST map file paths back to UUIDs for all output, so that consumers see UUIDs rather than raw file paths.
-- The system MAY include match context (surrounding lines) when requested.
+- By default, the system MUST output only the UUIDs of notes that contain at least one match.
+- When `--with-context` is specified, the system MUST output per-note details including UUID, sensitivity, file group, and matching line numbers with their content.
+- The system MUST NOT expose raw file paths in any output.
 
 ### Error Handling
 
-- The system MUST return a non-zero exit code if ripgrep is not installed.
 - The system MUST handle the case where no accessible notes exist and return an empty result.
-- The system MUST handle the case where ripgrep finds no matches and return an empty result without error.
+- The system MUST handle the case where no matches are found and return an empty result without error.
 
 ### Logging
 
@@ -43,55 +40,51 @@ The `query` command performs full-text search across notes accessible to an API 
 ### Query Execution
 
 1. Resolve the API key and expand its access set.
-2. Retrieve all accessible note paths from the index.
+2. Retrieve all notes accessible to the key from the index.
 3. If no accessible notes exist, return empty results.
-4. Construct the ripgrep command:
-   - `rg --json [--case-sensitive] <pattern> <path1> <path2> ...`
-5. Execute ripgrep and capture stdout.
-6. Parse JSON output lines; each line is a ripgrep event (match, begin, end, summary).
-7. For each match event, resolve the file path to a UUID using the index.
-8. Aggregate results by UUID.
+4. Collect the set of effective sensitivity values from the accessible notes.
+5. Search the `notes_fts` table (FTS5) or `notes` table (`INSTR`) filtered to those sensitivities.
+6. For each matching note, extract matching lines from the stored content.
+7. Return results as `(NoteMetadata, [(line_number, line_text)])` tuples.
 
 ### Output Modes
 
-**Default (line matches):**
-```
-<uuid>  <line-number>  <matched-line-content>
-```
-
-**Files only (`--files-only`):**
+**Default (UUIDs only):**
 ```
 <uuid>
 <uuid>
 ```
 
-## Dependencies
-
-| Dependency | Required | Notes |
-|------------|----------|-------|
-| `ripgrep` (`rg`) | Yes | System package; not installed by pip/uv |
+**With context (`--with-context`):**
+```
+UUID: <uuid>
+Sensitivity: <level>
+Group: <group>
+Matches: N line(s)
+  Line 12: <matched line content>
+```
 
 ## CLI
 
 ```bash
-nv query --api-key <key> <pattern> [--case-sensitive] [--files-only]
+nv query --key <raw-key> <pattern> [--case-sensitive] [--with-context]
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--api-key KEY` | (or `NOTES_VAULT_KEY` env var) | Raw API key |
+| `--key KEY` | (or `NOTES_VAULT_KEY` env var) | Raw API key |
 | `--case-sensitive` | False | Enable case-sensitive matching |
-| `--files-only` | False | Output only UUIDs of matching notes |
+| `--with-context` | False | Show match details including line content |
 
 ## Example
 
 ```bash
-# Find notes containing "meeting agenda"
-nv query --api-key $MY_KEY "meeting agenda"
+# Find notes containing "meeting agenda" (prints matching UUIDs)
+nv query --key $MY_KEY "meeting agenda"
 
-# Case-sensitive search for a specific tag
-nv query --api-key $MY_KEY "TODO" --case-sensitive
+# Case-sensitive search
+nv query --key $MY_KEY "TODO" --case-sensitive
 
-# Get only the UUIDs of notes mentioning "project alpha"
-nv query --api-key $MY_KEY "project alpha" --files-only
+# Show match details including line content
+nv query --key $MY_KEY "project alpha" --with-context
 ```

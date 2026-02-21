@@ -25,12 +25,25 @@ def init_db() -> None:
                 effective_sensitivity TEXT NOT NULL,
                 last_modified TIMESTAMP,
                 last_indexed TIMESTAMP,
-                content_hash TEXT
+                content_hash TEXT,
+                content TEXT
             )
         """)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_effective_sensitivity ON notes(effective_sensitivity)"
         )
+
+        # Migrate existing databases that lack the content column
+        try:
+            conn.execute("ALTER TABLE notes ADD COLUMN content TEXT")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+        # Standalone FTS5 table for full-text search.
+        # Rowid matches notes.rowid so the tables can be joined efficiently.
+        conn.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(content)
+        """)
 
         conn.execute("""
             CREATE TABLE IF NOT EXISTS access_log (
@@ -55,15 +68,29 @@ def get_db_connection() -> sqlite3.Connection:
     return conn
 
 
-def upsert_note(note: NoteMetadata) -> None:
+def _upsert_fts(conn: sqlite3.Connection, note_uuid: str, content: str | None) -> None:
+    """Delete and re-insert the FTS5 entry for a note, identified by notes.rowid."""
+    row = conn.execute("SELECT rowid FROM notes WHERE uuid = ?", (note_uuid,)).fetchone()
+    if row is None:
+        return
+    rowid = row[0]
+    conn.execute("DELETE FROM notes_fts WHERE rowid = ?", (rowid,))
+    if content is not None:
+        conn.execute(
+            "INSERT INTO notes_fts(rowid, content) VALUES (?, ?)", (rowid, content)
+        )
+
+
+def upsert_note(note: NoteMetadata, content: str | None = None) -> None:
     """Insert or update a note in the database."""
     conn = get_db_connection()
     try:
         conn.execute(
             """
             INSERT INTO notes (uuid, file_path, file_group, detected_sensitivities,
-                               effective_sensitivity, last_modified, last_indexed, content_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                               effective_sensitivity, last_modified, last_indexed,
+                               content_hash, content)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(uuid) DO UPDATE SET
                 file_path = excluded.file_path,
                 file_group = excluded.file_group,
@@ -71,7 +98,8 @@ def upsert_note(note: NoteMetadata) -> None:
                 effective_sensitivity = excluded.effective_sensitivity,
                 last_modified = excluded.last_modified,
                 last_indexed = excluded.last_indexed,
-                content_hash = excluded.content_hash
+                content_hash = excluded.content_hash,
+                content = excluded.content
             """,
             (
                 str(note.uuid),
@@ -82,8 +110,10 @@ def upsert_note(note: NoteMetadata) -> None:
                 note.last_modified.isoformat(),
                 note.last_indexed.isoformat(),
                 note.content_hash,
+                content,
             ),
         )
+        _upsert_fts(conn, str(note.uuid), content)
         conn.commit()
     finally:
         conn.close()
@@ -161,17 +191,18 @@ def list_notes(sensitivities: set[str] | None = None) -> list[NoteMetadata]:
         conn.close()
 
 
-def upsert_notes_batch(notes: list[NoteMetadata]) -> None:
+def upsert_notes_batch(notes_with_content: list[tuple[NoteMetadata, str]]) -> None:
     """Insert or update multiple notes in a single transaction."""
-    if not notes:
+    if not notes_with_content:
         return
     conn = get_db_connection()
     try:
         conn.executemany(
             """
             INSERT INTO notes (uuid, file_path, file_group, detected_sensitivities,
-                               effective_sensitivity, last_modified, last_indexed, content_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                               effective_sensitivity, last_modified, last_indexed,
+                               content_hash, content)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(uuid) DO UPDATE SET
                 file_path = excluded.file_path,
                 file_group = excluded.file_group,
@@ -179,7 +210,8 @@ def upsert_notes_batch(notes: list[NoteMetadata]) -> None:
                 effective_sensitivity = excluded.effective_sensitivity,
                 last_modified = excluded.last_modified,
                 last_indexed = excluded.last_indexed,
-                content_hash = excluded.content_hash
+                content_hash = excluded.content_hash,
+                content = excluded.content
             """,
             [
                 (
@@ -191,11 +223,87 @@ def upsert_notes_batch(notes: list[NoteMetadata]) -> None:
                     note.last_modified.isoformat(),
                     note.last_indexed.isoformat(),
                     note.content_hash,
+                    content,
                 )
-                for note in notes
+                for note, content in notes_with_content
             ],
         )
+        # Sync FTS5 index for each upserted note
+        for note, content in notes_with_content:
+            _upsert_fts(conn, str(note.uuid), content)
         conn.commit()
+    finally:
+        conn.close()
+
+
+def search_notes_fts(
+    query: str,
+    sensitivities: set[str] | None = None,
+    case_sensitive: bool = False,
+) -> list[tuple[NoteMetadata, list[tuple[int, str]]]]:
+    """Search notes using FTS5 (case-insensitive) or INSTR (case-sensitive).
+
+    Returns a list of (note, matching_lines) tuples where matching_lines is a
+    list of (line_number, line_text) pairs.
+    """
+    conn = get_db_connection()
+    try:
+        if case_sensitive:
+            # INSTR is case-sensitive in SQLite
+            if sensitivities:
+                placeholders = ",".join("?" * len(sensitivities))
+                sql = (
+                    f"SELECT * FROM notes WHERE INSTR(content, ?) > 0"
+                    f" AND effective_sensitivity IN ({placeholders})"
+                )
+                rows = conn.execute(sql, (query, *tuple(sensitivities))).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM notes WHERE INSTR(content, ?) > 0", (query,)
+                ).fetchall()
+        else:
+            # Wrap in double quotes for exact phrase matching in FTS5
+            fts_query = '"' + query.replace('"', '""') + '"'
+            if sensitivities:
+                placeholders = ",".join("?" * len(sensitivities))
+                sql = (
+                    "SELECT n.* FROM notes_fts"
+                    " JOIN notes n ON notes_fts.rowid = n.rowid"
+                    f" WHERE notes_fts MATCH ?"
+                    f" AND n.effective_sensitivity IN ({placeholders})"
+                    " ORDER BY rank"
+                )
+                rows = conn.execute(sql, (fts_query, *tuple(sensitivities))).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT n.* FROM notes_fts"
+                    " JOIN notes n ON notes_fts.rowid = n.rowid"
+                    " WHERE notes_fts MATCH ?"
+                    " ORDER BY rank",
+                    (fts_query,),
+                ).fetchall()
+
+        results = []
+        for row in rows:
+            note = NoteMetadata(
+                uuid=UUID(row["uuid"]),
+                file_path=row["file_path"],
+                file_group=row["file_group"],
+                detected_sensitivities=set(json.loads(row["detected_sensitivities"])),
+                effective_sensitivity=row["effective_sensitivity"],
+                last_modified=datetime.fromisoformat(row["last_modified"]),
+                last_indexed=datetime.fromisoformat(row["last_indexed"]),
+                content_hash=row["content_hash"],
+            )
+            note_content = row["content"] or ""
+            matching_lines = [
+                (line_num, line.strip())
+                for line_num, line in enumerate(note_content.splitlines(), start=1)
+                if (query in line if case_sensitive else query.lower() in line.lower())
+            ]
+            results.append((note, matching_lines))
+
+        return results
     finally:
         conn.close()
 
@@ -204,6 +312,12 @@ def delete_note_by_path(file_path: str) -> None:
     """Delete a note from the database by its file path."""
     conn = get_db_connection()
     try:
+        # Remove FTS5 entry before deleting from notes
+        row = conn.execute(
+            "SELECT rowid FROM notes WHERE file_path = ?", (file_path,)
+        ).fetchone()
+        if row:
+            conn.execute("DELETE FROM notes_fts WHERE rowid = ?", (row[0],))
         conn.execute("DELETE FROM notes WHERE file_path = ?", (file_path,))
         conn.commit()
     finally:
@@ -236,6 +350,7 @@ def clear_all_notes() -> None:
     """Clear all notes from the database."""
     conn = get_db_connection()
     try:
+        conn.execute("DELETE FROM notes_fts")
         conn.execute("DELETE FROM notes")
         conn.commit()
     finally:

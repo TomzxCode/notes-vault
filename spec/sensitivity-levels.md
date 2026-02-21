@@ -100,4 +100,4 @@ Levels not present in this list fall to the end of the precedence order. The pre
 | `nv sensitivities list` | List all levels |
 | `nv sensitivities update <name> [--description <text>] [--query <regex>]` | Update a level |
 | `nv sensitivities delete <name>` | Delete a level |
-| `nv sensitivities include <name> --include <other>` | Add an include relationship |
+| `nv sensitivities include <name> --include-level <other>` | Add an include relationship |

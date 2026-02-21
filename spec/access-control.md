@@ -11,7 +11,7 @@ Access control governs which notes an API key can read. It is enforced at every 
 - The system MUST resolve an API key from its raw value by computing its SHA-256 hash and comparing against stored key hashes.
 - The system MUST NOT store raw API key values anywhere in configuration or on disk.
 - The system MUST return an error if no key matching the provided raw value is found.
-- The system MAY also accept the raw key value via the `NOTES_VAULT_KEY` environment variable as an alternative to the `--api-key` CLI option.
+- The system MAY also accept the raw key value via the `NOTES_VAULT_KEY` environment variable as an alternative to the `--key` CLI option.
 
 ### Permission Checking
 
@@ -75,8 +75,8 @@ AccessLogEntry:
 
 1. Resolve the API key.
 2. Expand the key's sensitivities.
-3. Retrieve all accessible note paths via the list operation.
-4. Execute ripgrep against only those paths.
+3. Retrieve all accessible notes via the list operation.
+4. Search the SQLite FTS5 index filtered to the accessible sensitivity set.
 5. Log a query access entry.
 
 ## Security Properties

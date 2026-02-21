@@ -12,8 +12,9 @@ Notes Vault (`notes-vault` or `nv`) is a standalone Python CLI tool that manages
 - **Flexible access control**: Define API keys with specific sensitivity permissions
 - **Hierarchical access**: Sensitivity levels can include other levels (e.g., `private` includes `work` and `public`)
 - **File group management**: Organize notes using glob patterns
-- **Efficient indexing**: On-demand indexing with incremental updates
-- **SQLite storage**: Fast querying of note metadata
+- **Efficient indexing**: On-demand indexing with incremental updates and progress reporting
+- **Full-text search**: Fast SQLite FTS5-powered search across accessible notes
+- **SQLite storage**: Note metadata and content indexed for fast querying
 - **YAML configuration**: Human-readable configuration files
 - **Access logging**: Audit trail for all access attempts
 
@@ -22,16 +23,6 @@ Notes Vault (`notes-vault` or `nv`) is a standalone Python CLI tool that manages
 ```bash
 # Install with uv
 uv tool install https://github.com/TomzxCode/notes-vault.git
-
-
-# Install ripgrep (required for query command)
-# On Ubuntu/Debian:
-sudo apt install ripgrep
-
-# On macOS:
-brew install ripgrep
-
-# On other platforms, see: https://github.com/BurntSushi/ripgrep#installation
 ```
 
 ## Quick Start
@@ -88,6 +79,13 @@ nv list --key public_key
 
 # Get a specific note by UUID
 nv get --key public_key <uuid>
+
+# Search within accessible notes
+nv query --key public_key "search term"
+
+# API key can also be set via environment variable
+export NOTES_VAULT_KEY=public_key
+nv list
 ```
 
 ## Configuration
@@ -238,7 +236,8 @@ nv query --key <key-name> <query-string> --with-context
 
 - **Manual**: Run `nv index` to scan and update the metadata index
 - **Incremental**: Only re-scans files with changed modification times
-- **Efficient**: Uses glob patterns for file discovery
+- **Efficient**: Batch writes and glob-based file discovery
+- **Content stored**: Note content is stored in SQLite to power full-text search without ripgrep
 
 ## Development
 
