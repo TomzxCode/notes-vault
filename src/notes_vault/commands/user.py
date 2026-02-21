@@ -130,29 +130,35 @@ def query(
         rg_args.append("--ignore-case")
 
     rg_args.append(query_string)
-    rg_args.extend(file_paths)
 
     try:
-        result = subprocess.run(
-            rg_args,
-            capture_output=True,
-            text=True,
-            check=False,  # Don't raise on non-zero exit (no matches)
-        )
+        batch_size = 100
+        batches = [file_paths[i:i + batch_size] for i in range(0, len(file_paths), batch_size)]
+        combined_stdout = []
 
-        if result.returncode not in [0, 1]:
-            # Exit code 2+ means error
-            console.print(f"[red]Error running ripgrep:[/red] {result.stderr}")
-            return
+        for batch in batches:
+            result = subprocess.run(
+                rg_args + batch,
+                capture_output=True,
+                text=True,
+                check=False,  # Don't raise on non-zero exit (no matches)
+            )
 
-        if result.returncode == 1 or not result.stdout:
-            # No matches found
+            if result.returncode not in [0, 1]:
+                # Exit code 2+ means error
+                console.print(f"[red]Error running ripgrep:[/red] {result.stderr}")
+                return
+
+            if result.stdout:
+                combined_stdout.append(result.stdout)
+
+        if not combined_stdout:
             console.print(f"[yellow]No matches found for query: '{query_string}'[/yellow]")
             return
 
         # Parse ripgrep JSON output
         matches_by_file = {}
-        for line in result.stdout.strip().split("\n"):
+        for line in "".join(combined_stdout).strip().split("\n"):
             if not line:
                 continue
 
