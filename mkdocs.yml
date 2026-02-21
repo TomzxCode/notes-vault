@@ -1,0 +1,81 @@
+site_name: Notes Vault Documentation
+site_description: Documentation for Notes Vault - a privacy-sensitive notes management CLI tool with hashtag-based access control
+site_url: https://tomzxcode.github.io/notes-vault
+repo_name: tomzxcode/notes-vault
+repo_url: https://github.com/tomzxcode/notes-vault
+edit_uri: edit/main/docs/
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/tomzxcode/notes-vault
+
+theme:
+  name: material
+  font:
+    text: Open Sans
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - search.share
+    - content.action.edit
+    - content.action.view
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: green
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: green
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Quick Start: quickstart.md
+  - Concepts: concepts.md
+  - Configuration: configuration.md
+  - CLI Reference: cli.md
+  - Development: development.md
+  - Specifications:
+    - Indexing: spec/indexing.md
+    - Storage: spec/storage.md
+    - Query: spec/query.md
+    - Sensitivity Detection: spec/sensitivity-detection.md
+    - Sensitivity Levels: spec/sensitivity-levels.md
+    - Access Control: spec/access-control.md
+    - File Groups: spec/file-groups.md
+    - API Keys: spec/api-keys.md
+    - Configuration: spec/configuration.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+plugins:
+  - search
+  - social

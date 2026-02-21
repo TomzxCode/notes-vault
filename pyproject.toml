@@ -24,6 +24,12 @@ nvu = "notes_vault.cli:main_user"
 dev = [
     "pytest>=9.0.2",
     "ruff>=0.15.0",
+    {include-group = "docs"},
+]
+
+docs = [
+    "mkdocs-material[imaging]>=9.4.0",
+    "zensical>=0.0.23",
 ]
 
 [tool.ruff]

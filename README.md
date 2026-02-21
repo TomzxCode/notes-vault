@@ -20,15 +20,9 @@ Notes Vault (`notes-vault` or `nv`) is a standalone Python CLI tool that manages
 ## Installation
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd notes-vault
-
 # Install with uv
-uv sync
+uv tools install https://github.com/TomzxCode/notes-vault.git
 
-# Or install with pip
-pip install -e .
 
 # Install ripgrep (required for query command)
 # On Ubuntu/Debian:
