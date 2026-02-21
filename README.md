@@ -21,7 +21,7 @@ Notes Vault (`notes-vault` or `nv`) is a standalone Python CLI tool that manages
 
 ```bash
 # Install with uv
-uv tools install https://github.com/TomzxCode/notes-vault.git
+uv tool install https://github.com/TomzxCode/notes-vault.git
 
 
 # Install ripgrep (required for query command)
@@ -45,9 +45,9 @@ nv sensitivities add work --description "Work notes" --query "#work"
 nv sensitivities add public --description "Public notes" --query "#public"
 
 # Set up access hierarchy (private includes work and public)
-nv sensitivities include private --include work
-nv sensitivities include private --include public
-nv sensitivities include work --include public
+nv sensitivities include private --include-level work
+nv sensitivities include private --include-level public
+nv sensitivities include work --include-level public
 ```
 
 ### 2. Add File Groups
@@ -84,15 +84,15 @@ nv index
 
 ```bash
 # List accessible notes
-nv list --api-key public_key
+nv list --key public_key
 
 # Get a specific note by UUID
-nv get --api-key public_key <uuid>
+nv get --key public_key <uuid>
 ```
 
 ## Configuration
 
-Configuration is stored in `~/.vault/config.yaml` (or `$VAULT_CONFIG_DIR/config.yaml`).
+Configuration is stored under `~/.config/notes-vault/config.yaml` (XDG: `$XDG_CONFIG_HOME/notes-vault/config.yaml`). The SQLite index and access log are stored under `~/.local/share/notes-vault/`.
 
 ### Configuration Structure
 
@@ -107,9 +107,11 @@ files:
 
 keys:
   admin_key:
+    key_hash: "<sha256-hash>"
     sensitivities:
       - private
   work_key:
+    key_hash: "<sha256-hash>"
     sensitivities:
       - work
 
@@ -194,26 +196,26 @@ nv sensitivities update <name> --description <new-desc> --query <new-regex>
 nv sensitivities delete <name>
 
 # Add include relationship
-nv sensitivities include <name> --include <other-level>
+nv sensitivities include <name> --include-level <other-level>
 ```
 
 ### User Commands
 
 ```bash
 # List accessible notes
-nv list --api-key <key-name>
+nv list --key <key-name>
 
 # Get note content
-nv get --api-key <key-name> <uuid>
+nv get --key <key-name> <uuid>
 
 # Search for content within accessible notes
-nv query --api-key <key-name> <query-string>
+nv query --key <key-name> <query-string>
 
 # Case-sensitive search
-nv query --api-key <key-name> <query-string> --case-sensitive
+nv query --key <key-name> <query-string> --case-sensitive
 
-# Return only UUIDs of matching files
-nv query --api-key <key-name> <query-string> --files-only
+# Show match details and line content
+nv query --key <key-name> <query-string> --with-context
 ```
 
 ## How It Works
@@ -221,8 +223,8 @@ nv query --api-key <key-name> <query-string> --files-only
 ### Sensitivity Detection
 
 1. Notes are scanned for hashtags matching sensitivity query patterns
-2. If multiple hashtags found, precedence order is applied (configurable via `defaults.precedence`)
-3. If no hashtags found, file group's default sensitivity is used
+2. If multiple hashtags found, the most restrictive (highest in the hierarchy) wins
+3. If no hashtags found, the file group's default sensitivity is used; if none, the global default applies
 4. Detected sensitivities and effective sensitivity are stored in the index
 
 ### Access Control
@@ -234,9 +236,9 @@ nv query --api-key <key-name> <query-string> --files-only
 
 ### Indexing
 
-- **On-demand**: Triggered manually or automatically before list/get commands
+- **Manual**: Run `nv index` to scan and update the metadata index
 - **Incremental**: Only re-scans files with changed modification times
-- **Efficient**: Uses glob patterns for file discovery and caches compiled regex patterns
+- **Efficient**: Uses glob patterns for file discovery
 
 ## Development
 
