@@ -45,7 +45,9 @@ def test_check_access_denied(temp_config_dir, temp_notes_dir, sample_config):
 
 
 def test_check_access_union_based(temp_config_dir, temp_notes_dir, sample_config):
-    """Test that union-based access works: a note with multiple tags is accessible to any matching key."""
+    """Test that union-based access works: a note with multiple tags is
+    accessible to any matching key.
+    """
     init_db()
     save_config(sample_config)
     index_all()

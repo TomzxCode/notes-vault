@@ -10,10 +10,10 @@ import cyclopts
 from rich.console import Console
 from rich.table import Table
 
-from notes_vault.access_control import get_note_if_accessible, resolve_key
+from notes_vault.access_control import get_accessible_notes, get_note_if_accessible, resolve_key
 from notes_vault.config import load_config
-from notes_vault.sensitivity import expand_access
 from notes_vault.models import ApiKey
+from notes_vault.sensitivity import expand_access
 from notes_vault.storage import init_db, search_notes_fts
 
 console = Console()

@@ -14,7 +14,10 @@ console = Console()
 
 def _prompt_index():
     """Prompt user to run index command."""
-    console.print("\n[yellow]Hint:[/yellow] Sensitivity levels have changed. Run [cyan]nv index[/cyan] to update the database.")
+    console.print(
+        "\n[yellow]Hint:[/yellow] Sensitivity levels have changed. Run "
+        "[cyan]nv index[/cyan] to update the database."
+    )
 
 
 def add(

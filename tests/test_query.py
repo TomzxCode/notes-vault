@@ -46,17 +46,48 @@ def test_query_case_sensitive(temp_config_dir, temp_notes_dir, sample_config, ca
 
 
 def test_query_respects_access_control(temp_config_dir, temp_notes_dir, sample_config, capsys):
-    """Test query respects access control."""
+    """Test query respects access control.
+
+    private.md has unique content "content" at the end that doesn't appear in
+    mixed.md, ensuring this only matches the private-only note.
+    """
     init_db()
     save_config(sample_config)
     index_all()
 
-    # public_key only has access to "public" sensitivity notes
-    query("private", TEST_RAW_KEYS["public_key"])
+    # Search for unique content from the private-only note
+    query("#private content", TEST_RAW_KEYS["public_key"])
 
     captured = capsys.readouterr()
-    # Should not find private notes via a public key
-    assert "Found" not in captured.out or "No matches" in captured.out
+    # Should not find private-only notes via a public key
+    assert "Found" not in captured.out
+    assert "No matches found" in captured.out
+
+
+def test_query_no_expansion_attack(temp_config_dir, temp_notes_dir, sample_config, capsys):
+    """Test that query doesn't leak access via mixed-sensitivity notes.
+
+    This tests against a vulnerability where a note with multiple sensitivities
+    (e.g., #public and #private) could cause the accessible_sensitivities set to
+    expand, allowing search results the key shouldn't have access to.
+
+    Scenario:
+    - public_key has access to {public} only
+    - mixed.md has {public, private} - accessible via #public
+    - private.md has {private} only - NOT accessible
+
+    The query should NOT find private.md even though mixed.md is accessible.
+    """
+    init_db()
+    save_config(sample_config)
+    index_all()
+
+    # Search for unique content from the private-only note
+    query("This is #private", TEST_RAW_KEYS["public_key"])
+
+    captured = capsys.readouterr()
+    # private.md should not be found
+    assert "No matches found" in captured.out
 
 
 def test_query_files_only(temp_config_dir, temp_notes_dir, sample_config, capsys):

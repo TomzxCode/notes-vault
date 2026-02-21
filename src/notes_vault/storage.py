@@ -72,9 +72,7 @@ def _upsert_fts(conn: sqlite3.Connection, note_uuid: str, content: str | None) -
     rowid = row[0]
     conn.execute("DELETE FROM notes_fts WHERE rowid = ?", (rowid,))
     if content is not None:
-        conn.execute(
-            "INSERT INTO notes_fts(rowid, content) VALUES (?, ?)", (rowid, content)
-        )
+        conn.execute("INSERT INTO notes_fts(rowid, content) VALUES (?, ?)", (rowid, content))
 
 
 def upsert_note(note: NoteMetadata, content: str | None = None) -> None:
@@ -322,9 +320,7 @@ def delete_note_by_path(file_path: str) -> None:
     conn = get_db_connection()
     try:
         # Remove FTS5 entry before deleting from notes
-        row = conn.execute(
-            "SELECT rowid FROM notes WHERE file_path = ?", (file_path,)
-        ).fetchone()
+        row = conn.execute("SELECT rowid FROM notes WHERE file_path = ?", (file_path,)).fetchone()
         if row:
             conn.execute("DELETE FROM notes_fts WHERE rowid = ?", (row[0],))
         conn.execute("DELETE FROM notes WHERE file_path = ?", (file_path,))
