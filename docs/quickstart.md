@@ -104,7 +104,7 @@ A note with both `#work` and `#private`:
 Notes about the project...
 ```
 
-When multiple hashtags are present, the effective sensitivity is determined by precedence (the level highest in the hierarchy wins).
+When multiple hashtags are present, the note is accessible to ANY key that has access to ANY of the detected sensitivities. In this example, both `work_key` and `admin_key` could access this note.
 
 ## Next Steps
 

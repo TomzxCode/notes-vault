@@ -91,7 +91,7 @@ All data structures are defined as Pydantic models:
 - `SensitivityLevel` - name, description, regex query, includes set
 - `FileGroup` - name, glob path, default sensitivity
 - `ApiKey` - name, SHA-256 hashed key, sensitivities set
-- `NoteMetadata` - UUID, path, group, detected/effective sensitivities, timestamps, content hash
+- `NoteMetadata` - UUID, path, group, detected sensitivities, timestamps, content hash
 - `Config` - top-level config container
 - `AccessLogEntry` - timestamp, key, action, UUID, granted flag
 
@@ -112,7 +112,6 @@ Wraps a SQLite database for note metadata and content. Provides:
 
 - `detect_sensitivities` - scans content against all level regex patterns
 - `expand_access` - resolves the full set of accessible levels via includes
-- `resolve_effective_sensitivity` - picks one sensitivity from a set based on hierarchy
 
 ### Indexer (`indexer.py`)
 
@@ -122,9 +121,10 @@ Wraps a SQLite database for note metadata and content. Provides:
 
 ### Access Control (`access_control.py`)
 
-- `hash_key` - SHA-256 hash of a raw key
-- `verify_key` - compare raw key against stored hash
-- `check_access` - determine if a key can access a note at a given sensitivity
+- `resolve_key` - resolve API key from raw secret value by comparing SHA-256 hash
+- `check_access` - determine if a key can access a note (checks if detected sensitivities intersect with key's expanded access)
+- `get_accessible_notes` - list all notes accessible to a key
+- `get_note_if_accessible` - retrieve a note by UUID if accessible
 
 ### CLI (`cli.py`)
 

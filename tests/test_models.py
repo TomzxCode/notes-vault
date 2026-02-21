@@ -44,11 +44,10 @@ def test_note_metadata():
         file_path="/test/note.md",
         file_group="notes",
         detected_sensitivities={"private", "public"},
-        effective_sensitivity="private",
         last_modified=datetime.now(),
         last_indexed=datetime.now(),
         content_hash="abc123",
     )
     assert note.uuid == note_uuid
-    assert note.effective_sensitivity == "private"
     assert len(note.detected_sensitivities) == 2
+    assert "private" in note.detected_sensitivities

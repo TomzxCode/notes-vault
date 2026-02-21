@@ -221,15 +221,15 @@ nv query --key <key-name> <query-string> --with-context
 ### Sensitivity Detection
 
 1. Notes are scanned for hashtags matching sensitivity query patterns
-2. If multiple hashtags found, the most restrictive (highest in the hierarchy) wins
+2. All matching sensitivities are recorded as detected sensitivities
 3. If no hashtags found, the file group's default sensitivity is used; if none, the global default applies
-4. Detected sensitivities and effective sensitivity are stored in the index
+4. Detected sensitivities are stored in the index
 
 ### Access Control
 
 1. API keys have a set of allowed sensitivity levels
 2. Access is expanded via `includes` relationships (e.g., `private` includes `work` and `public`)
-3. Notes are filtered based on their effective sensitivity
+3. A note is accessible if ANY of its detected sensitivities intersects with the key's expanded access set
 4. All access attempts are logged
 
 ### Indexing

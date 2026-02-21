@@ -12,6 +12,11 @@ from notes_vault.models import SensitivityLevel
 console = Console()
 
 
+def _prompt_index():
+    """Prompt user to run index command."""
+    console.print("\n[yellow]Hint:[/yellow] Sensitivity levels have changed. Run [cyan]nv index[/cyan] to update the database.")
+
+
 def add(
     name: Annotated[str, cyclopts.Parameter(help="Sensitivity level name")],
     description: Annotated[str, cyclopts.Parameter(help="Description of this level")],
@@ -32,6 +37,7 @@ def add(
     console.print(f"[green]✓[/green] Sensitivity level '{name}' added")
     console.print(f"  Description: {description}")
     console.print(f"  Query: {query}")
+    _prompt_index()
 
 
 def list_sensitivities():
@@ -74,6 +80,7 @@ def update(
 
     save_config(config)
     console.print(f"[green]✓[/green] Sensitivity level '{name}' updated")
+    _prompt_index()
 
 
 def delete(
@@ -89,6 +96,7 @@ def delete(
     del config.sensitivities[name]
     save_config(config)
     console.print(f"[green]✓[/green] Sensitivity level '{name}' deleted")
+    _prompt_index()
 
 
 def include(
@@ -109,3 +117,4 @@ def include(
     config.sensitivities[name].includes.add(include_level)
     save_config(config)
     console.print(f"[green]✓[/green] '{name}' now includes '{include_level}'")
+    _prompt_index()

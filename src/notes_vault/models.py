@@ -49,7 +49,6 @@ class NoteMetadata(BaseModel):
     file_path: str
     file_group: str
     detected_sensitivities: set[str] = Field(default_factory=set)
-    effective_sensitivity: str
     last_modified: datetime
     last_indexed: datetime
     content_hash: str

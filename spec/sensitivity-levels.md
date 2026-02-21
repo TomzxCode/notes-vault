@@ -82,16 +82,6 @@ SensitivityLevel:
 3. Add the target name to the source level's `includes` set.
 4. Write updated config.
 
-## Precedence Order
-
-When multiple sensitivity levels are detected in a single note, the effective sensitivity is resolved by precedence. The default precedence is:
-
-```
-private > work > family > friends > public > ai
-```
-
-Levels not present in this list fall to the end of the precedence order. The precedence order is currently hardcoded and not user-configurable.
-
 ## CLI Commands
 
 | Command | Description |

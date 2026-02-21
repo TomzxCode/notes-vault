@@ -10,7 +10,7 @@ import structlog
 
 from notes_vault.config import load_config
 from notes_vault.models import Config, NoteMetadata
-from notes_vault.sensitivity import detect_sensitivities, resolve_effective_sensitivity
+from notes_vault.sensitivity import detect_sensitivities
 from notes_vault.storage import delete_note_by_path, init_db, list_notes, upsert_notes_batch
 
 logger = structlog.get_logger()
@@ -53,7 +53,7 @@ def index_file(
     Args:
         file_path: Path to the file to index
         file_group_name: Name of the file group
-        file_group_sensitivity: Default sensitivity for the file group
+        file_group_sensitivity: Default sensitivity for the file group (used if no tags detected)
         config: Application configuration
         existing_note: Existing note metadata from database, if any
 
@@ -66,9 +66,12 @@ def index_file(
         logger.warning("Failed to read file", file_path=str(file_path), error=str(e))
         return None
 
-    # Detect sensitivities
+    # Detect sensitivities from content hashtags
     detected = detect_sensitivities(content, config)
-    effective = resolve_effective_sensitivity(detected, file_group_sensitivity, config)
+
+    # If no sensitivities detected, use file group default
+    if not detected:
+        detected = {file_group_sensitivity}
 
     # Generate or reuse UUID
     note_uuid = existing_note.uuid if existing_note else uuid4()
@@ -79,7 +82,6 @@ def index_file(
         file_path=str(file_path),
         file_group=file_group_name,
         detected_sensitivities=detected,
-        effective_sensitivity=effective,
         last_modified=datetime.fromtimestamp(file_path.stat().st_mtime),
         last_indexed=datetime.now(),
         content_hash=calculate_content_hash(content),
@@ -89,7 +91,7 @@ def index_file(
         "Indexed file",
         file_path=str(file_path),
         uuid=str(note_uuid),
-        effective_sensitivity=effective,
+        detected_sensitivities=sorted(detected),
     )
     return note, content
 

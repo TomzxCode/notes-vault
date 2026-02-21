@@ -15,11 +15,20 @@ When a note is indexed, its content is scanned against every configured sensitiv
 
 For example, a note containing `#private #work` would have both `private` and `work` as detected sensitivities.
 
-### Effective Sensitivity
+### Union-Based Access Control
 
-If a note matches multiple sensitivity levels, one is chosen as the **effective sensitivity**. The effective sensitivity is determined by which level is highest in the access hierarchy (i.e., the most restrictive).
+A note is accessible to an API key if **any** of its detected sensitivities matches the key's accessible sensitivities.
 
-If a note matches no sensitivity levels, the file group's default sensitivity is used. If there is no group default, the global default from `defaults.sensitivity` is used.
+For example, a note with `#llm` and `#private` tags is accessible to:
+- A key with `llm` access (via the `llm` tag)
+- A key with `private` access (via the `private` tag)
+- Any key that has access to either sensitivity level
+
+This allows notes with multiple sensitivity tags to be accessed by multiple different consumers, each via their appropriate access level.
+
+### Default Sensitivity
+
+If a note matches no sensitivity levels, the file group's default sensitivity is added as a detected sensitivity. This ensures that every note has at least one sensitivity level for access control purposes.
 
 ### Include Relationships
 
@@ -44,7 +53,7 @@ A file group is a named collection of note files matched by a glob pattern. Each
 
 - A **name** (e.g., `personal`, `work-notes`)
 - A **path** - a glob pattern (e.g., `~/notes/**/*.md`)
-- A **sensitivity** - the fallback sensitivity for notes in this group that match no hashtag
+- A **sensitivity** - the default sensitivity for notes in this group that match no hashtag
 
 File groups allow you to organize notes from different directories while applying appropriate defaults to each.
 
@@ -62,9 +71,9 @@ When a new key is created with `nv keys add`, the raw key value is printed once.
 
 ### Access Expansion
 
-When a key attempts to access notes, its granted sensitivities are expanded via the include relationships. For example, if a key has `{ private }` as its sensitivities and `private` includes `{ work, public }`, the key's effective access set is `{ private, work, public }`.
+When a key attempts to access notes, its granted sensitivities are expanded via the include relationships. For example, if a key has `{ private }` as its sensitivities and `private` includes `{ work, public }`, the key's expanded access set is `{ private, work, public }`.
 
-A note is accessible to a key if the note's effective sensitivity is within the key's expanded access set.
+A note is accessible to a key if the note's detected sensitivities intersect with the key's expanded access set.
 
 ---
 
@@ -76,7 +85,7 @@ The index is a SQLite database that stores metadata and content for each note. I
 2. Checks modification times - only re-processes files that have changed
 3. Reads each changed file and runs sensitivity detection
 4. Assigns a UUID to each note (stable across re-indexing)
-5. Stores metadata and full content: UUID, file path, file group, detected sensitivities, effective sensitivity, content hash, timestamps, note text
+5. Stores metadata and full content: UUID, file path, file group, detected sensitivities, content hash, timestamps, note text
 
 ### Why UUIDs?
 

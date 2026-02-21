@@ -2,7 +2,7 @@
 
 ## Overview
 
-Access control governs which notes an API key can read. It is enforced at every note retrieval operation by comparing the note's effective sensitivity against the key's expanded access set, and every attempt is recorded in an audit log.
+Access control governs which notes an API key can read. It is enforced at every note retrieval operation by checking if the note's detected sensitivities intersect with the key's expanded access set. Every access attempt is recorded in an audit log.
 
 ## Requirements
 
@@ -16,8 +16,8 @@ Access control governs which notes an API key can read. It is enforced at every 
 ### Permission Checking
 
 - The system MUST expand a key's granted sensitivities via the transitive `includes` closure before checking access (see `sensitivity-detection.md`).
-- The system MUST grant access to a note if and only if the note's effective sensitivity is within the key's expanded access set.
-- The system MUST deny access to notes whose effective sensitivity is not in the expanded access set.
+- The system MUST grant access to a note if and only if the note's detected sensitivities intersect with the key's expanded access set.
+- The system MUST deny access to notes whose detected sensitivities have no overlap with the expanded access set.
 - The system MUST log every access attempt regardless of whether access is granted or denied.
 
 ### Audit Logging
@@ -29,7 +29,7 @@ Access control governs which notes an API key can read. It is enforced at every 
 
 ### Listing
 
-- The system MUST filter the note index to return only notes whose effective sensitivity is in the key's expanded access set when listing notes.
+- The system MUST filter the note index to return only notes whose detected sensitivities intersect with the key's expanded access set when listing notes.
 - The `list` command MUST NOT log individual access per note; it MAY log a single list action.
 
 ## Data Model
@@ -61,14 +61,14 @@ AccessLogEntry:
 1. Resolve the API key.
 2. Expand the key's sensitivities via includes closure.
 3. Retrieve the note by UUID from the index.
-4. If the note's effective sensitivity is in the expanded set, return the note content and log `granted=True`.
+4. If the note's detected sensitivities intersect with the expanded access set, return the note content and log `granted=True`.
 5. Otherwise log `granted=False` and raise an authorization error.
 
 ### Access Check for `list`
 
 1. Resolve the API key.
 2. Expand the key's sensitivities.
-3. Query the index for all notes whose effective sensitivity is in the expanded set.
+3. Query the index for all notes whose detected sensitivities intersect with the expanded set.
 4. Return the filtered list without per-note audit logging.
 
 ### Access Check for `query`
@@ -76,8 +76,9 @@ AccessLogEntry:
 1. Resolve the API key.
 2. Expand the key's sensitivities.
 3. Retrieve all accessible notes via the list operation.
-4. Search the SQLite FTS5 index filtered to the accessible sensitivity set.
-5. Log a query access entry.
+4. Collect all detected sensitivities from accessible notes.
+5. Search the SQLite FTS5 index filtered to those detected sensitivities.
+6. Log a query access entry.
 
 ## Security Properties
 

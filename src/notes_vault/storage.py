@@ -22,16 +22,12 @@ def init_db() -> None:
                 file_path TEXT NOT NULL UNIQUE,
                 file_group TEXT NOT NULL,
                 detected_sensitivities TEXT,
-                effective_sensitivity TEXT NOT NULL,
                 last_modified TIMESTAMP,
                 last_indexed TIMESTAMP,
                 content_hash TEXT,
                 content TEXT
             )
         """)
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_effective_sensitivity ON notes(effective_sensitivity)"
-        )
 
         # Migrate existing databases that lack the content column
         try:
@@ -88,14 +84,12 @@ def upsert_note(note: NoteMetadata, content: str | None = None) -> None:
         conn.execute(
             """
             INSERT INTO notes (uuid, file_path, file_group, detected_sensitivities,
-                               effective_sensitivity, last_modified, last_indexed,
-                               content_hash, content)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               last_modified, last_indexed, content_hash, content)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(uuid) DO UPDATE SET
                 file_path = excluded.file_path,
                 file_group = excluded.file_group,
                 detected_sensitivities = excluded.detected_sensitivities,
-                effective_sensitivity = excluded.effective_sensitivity,
                 last_modified = excluded.last_modified,
                 last_indexed = excluded.last_indexed,
                 content_hash = excluded.content_hash,
@@ -106,7 +100,6 @@ def upsert_note(note: NoteMetadata, content: str | None = None) -> None:
                 note.file_path,
                 note.file_group,
                 json.dumps(sorted(list(note.detected_sensitivities))),
-                note.effective_sensitivity,
                 note.last_modified.isoformat(),
                 note.last_indexed.isoformat(),
                 note.content_hash,
@@ -132,7 +125,6 @@ def get_note_by_uuid(uuid: UUID) -> NoteMetadata | None:
             file_path=row["file_path"],
             file_group=row["file_group"],
             detected_sensitivities=set(json.loads(row["detected_sensitivities"])),
-            effective_sensitivity=row["effective_sensitivity"],
             last_modified=datetime.fromisoformat(row["last_modified"]),
             last_indexed=datetime.fromisoformat(row["last_indexed"]),
             content_hash=row["content_hash"],
@@ -154,7 +146,6 @@ def get_note_by_path(file_path: str) -> NoteMetadata | None:
             file_path=row["file_path"],
             file_group=row["file_group"],
             detected_sensitivities=set(json.loads(row["detected_sensitivities"])),
-            effective_sensitivity=row["effective_sensitivity"],
             last_modified=datetime.fromisoformat(row["last_modified"]),
             last_indexed=datetime.fromisoformat(row["last_indexed"]),
             content_hash=row["content_hash"],
@@ -164,12 +155,25 @@ def get_note_by_path(file_path: str) -> NoteMetadata | None:
 
 
 def list_notes(sensitivities: set[str] | None = None) -> list[NoteMetadata]:
-    """List notes, optionally filtered by sensitivity levels."""
+    """List notes, optionally filtered by sensitivity levels.
+
+    A note is accessible if ANY of its detected sensitivities matches
+    one of the requested sensitivity levels.
+    """
     conn = get_db_connection()
     try:
         if sensitivities:
+            # Filter by detected_sensitivities: match if any detected sensitivity is in the set
+            # detected_sensitivities is stored as JSON array like '["llm","private"]'
             placeholders = ",".join("?" * len(sensitivities))
-            query = f"SELECT * FROM notes WHERE effective_sensitivity IN ({placeholders})"
+            # Use json_each to check if any element of the JSON array matches
+            query = f"""
+                SELECT DISTINCT n.* FROM notes n
+                WHERE EXISTS (
+                    SELECT 1 FROM json_each(n.detected_sensitivities) AS j
+                    WHERE j.value IN ({placeholders})
+                )
+            """
             rows = conn.execute(query, tuple(sensitivities)).fetchall()
         else:
             rows = conn.execute("SELECT * FROM notes").fetchall()
@@ -180,7 +184,6 @@ def list_notes(sensitivities: set[str] | None = None) -> list[NoteMetadata]:
                 file_path=row["file_path"],
                 file_group=row["file_group"],
                 detected_sensitivities=set(json.loads(row["detected_sensitivities"])),
-                effective_sensitivity=row["effective_sensitivity"],
                 last_modified=datetime.fromisoformat(row["last_modified"]),
                 last_indexed=datetime.fromisoformat(row["last_indexed"]),
                 content_hash=row["content_hash"],
@@ -200,14 +203,12 @@ def upsert_notes_batch(notes_with_content: list[tuple[NoteMetadata, str]]) -> No
         conn.executemany(
             """
             INSERT INTO notes (uuid, file_path, file_group, detected_sensitivities,
-                               effective_sensitivity, last_modified, last_indexed,
-                               content_hash, content)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               last_modified, last_indexed, content_hash, content)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(uuid) DO UPDATE SET
                 file_path = excluded.file_path,
                 file_group = excluded.file_group,
                 detected_sensitivities = excluded.detected_sensitivities,
-                effective_sensitivity = excluded.effective_sensitivity,
                 last_modified = excluded.last_modified,
                 last_indexed = excluded.last_indexed,
                 content_hash = excluded.content_hash,
@@ -219,7 +220,6 @@ def upsert_notes_batch(notes_with_content: list[tuple[NoteMetadata, str]]) -> No
                     note.file_path,
                     note.file_group,
                     json.dumps(sorted(list(note.detected_sensitivities))),
-                    note.effective_sensitivity,
                     note.last_modified.isoformat(),
                     note.last_indexed.isoformat(),
                     note.content_hash,
@@ -245,6 +245,9 @@ def search_notes_fts(
 
     Returns a list of (note, matching_lines) tuples where matching_lines is a
     list of (line_number, line_text) pairs.
+
+    A note is searchable if ANY of its detected sensitivities matches
+    one of the requested sensitivity levels.
     """
     conn = get_db_connection()
     try:
@@ -252,10 +255,14 @@ def search_notes_fts(
             # INSTR is case-sensitive in SQLite
             if sensitivities:
                 placeholders = ",".join("?" * len(sensitivities))
-                sql = (
-                    f"SELECT * FROM notes WHERE INSTR(content, ?) > 0"
-                    f" AND effective_sensitivity IN ({placeholders})"
-                )
+                sql = f"""
+                    SELECT n.* FROM notes n
+                    WHERE INSTR(n.content, ?) > 0
+                    AND EXISTS (
+                        SELECT 1 FROM json_each(n.detected_sensitivities) AS j
+                        WHERE j.value IN ({placeholders})
+                    )
+                """
                 rows = conn.execute(sql, (query, *tuple(sensitivities))).fetchall()
             else:
                 rows = conn.execute(
@@ -266,13 +273,16 @@ def search_notes_fts(
             fts_query = '"' + query.replace('"', '""') + '"'
             if sensitivities:
                 placeholders = ",".join("?" * len(sensitivities))
-                sql = (
-                    "SELECT n.* FROM notes_fts"
-                    " JOIN notes n ON notes_fts.rowid = n.rowid"
-                    f" WHERE notes_fts MATCH ?"
-                    f" AND n.effective_sensitivity IN ({placeholders})"
-                    " ORDER BY rank"
-                )
+                sql = f"""
+                    SELECT DISTINCT n.* FROM notes_fts
+                    JOIN notes n ON notes_fts.rowid = n.rowid
+                    WHERE notes_fts MATCH ?
+                    AND EXISTS (
+                        SELECT 1 FROM json_each(n.detected_sensitivities) AS j
+                        WHERE j.value IN ({placeholders})
+                    )
+                    ORDER BY n.rowid
+                """
                 rows = conn.execute(sql, (fts_query, *tuple(sensitivities))).fetchall()
             else:
                 rows = conn.execute(
@@ -290,7 +300,6 @@ def search_notes_fts(
                 file_path=row["file_path"],
                 file_group=row["file_group"],
                 detected_sensitivities=set(json.loads(row["detected_sensitivities"])),
-                effective_sensitivity=row["effective_sensitivity"],
                 last_modified=datetime.fromisoformat(row["last_modified"]),
                 last_indexed=datetime.fromisoformat(row["last_indexed"]),
                 content_hash=row["content_hash"],

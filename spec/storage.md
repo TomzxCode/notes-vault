@@ -15,7 +15,7 @@ Notes Vault uses a SQLite database as the metadata index for indexed notes and a
 ### Notes Table
 
 - The system MUST store one row per note, keyed by UUID.
-- The system MUST store the following fields per note: `uuid`, `file_path`, `file_group`, `detected_sensitivities`, `effective_sensitivity`, `content_hash`, `last_indexed`, `last_modified`, `content`.
+- The system MUST store the following fields per note: `uuid`, `file_path`, `file_group`, `detected_sensitivities`, `content_hash`, `last_indexed`, `last_modified`, `content`.
 - The system MUST serialize `detected_sensitivities` (a set) as a JSON array for storage.
 - The system MUST deserialize `detected_sensitivities` back into a set on read.
 - The system MUST store the full text content of each note to support full-text search.
@@ -28,13 +28,13 @@ Notes Vault uses a SQLite database as the metadata index for indexed notes and a
 - The system MUST keep `notes_fts` in sync with the `notes` table by updating it on every upsert and delete.
 - The system MUST use FTS5 phrase matching for case-insensitive search.
 - The system MUST use SQLite `INSTR` for case-sensitive search.
-- The system MUST filter search results to a specified set of effective sensitivity values.
+- The system MUST filter search results to notes whose detected sensitivities intersect with the provided sensitivity set.
 
 ### Querying Notes
 
 - The system MUST support retrieving a single note by UUID.
 - The system MUST support retrieving a single note by file path.
-- The system MUST support listing all notes with optional filtering by a set of effective sensitivity values.
+- The system MUST support listing all notes with optional filtering by a set of sensitivity levels (returns notes where ANY detected sensitivity matches).
 - The system SHOULD use parameterized queries to prevent SQL injection.
 
 ### Deletion
@@ -61,14 +61,11 @@ CREATE TABLE IF NOT EXISTS notes (
     file_path TEXT NOT NULL UNIQUE,
     file_group TEXT NOT NULL,
     detected_sensitivities TEXT,       -- JSON array
-    effective_sensitivity TEXT NOT NULL,
     last_modified TIMESTAMP,
     last_indexed TIMESTAMP,
     content_hash TEXT,
     content TEXT
 );
-
-CREATE INDEX IF NOT EXISTS idx_effective_sensitivity ON notes(effective_sensitivity);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(content);
 
@@ -91,7 +88,7 @@ CREATE TABLE IF NOT EXISTS access_log (
 | `upsert_notes_batch(notes)` | Insert or update multiple notes in one transaction |
 | `get_note_by_uuid(uuid)` | Return `NoteMetadata` or `None` |
 | `get_note_by_path(path)` | Return `NoteMetadata` or `None` |
-| `list_notes(sensitivities?)` | Return list of `NoteMetadata`, optionally filtered by sensitivity |
+| `list_notes(sensitivities?)` | Return list of `NoteMetadata`, optionally filtered by sensitivity (ANY match) |
 | `search_notes_fts(query, sensitivities?, case_sensitive?)` | Full-text search returning `(NoteMetadata, [(line_num, line_text)])` tuples |
 | `delete_note_by_path(path)` | Remove note record and FTS5 entry by file path |
 | `clear_all_notes()` | Remove all note records and FTS5 entries |
@@ -100,3 +97,5 @@ CREATE TABLE IF NOT EXISTS access_log (
 ## Notes on Serialization
 
 `detected_sensitivities` is stored as a JSON array (e.g., `'["private", "work"]'`). On read, the string is parsed back to a `set[str]`.
+
+Filtering by sensitivities uses `json_each()` to check if any element in the JSON array matches the provided sensitivity set.

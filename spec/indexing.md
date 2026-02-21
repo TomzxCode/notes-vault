@@ -23,15 +23,16 @@ Indexing discovers note files on disk, extracts sensitivity metadata, and persis
 
 ### Note Identity
 
-- Each note MUST be assigned a UUID derived deterministically from its content hash (SHA-256).
-- If a file's content has not changed but its path has (rename), the system SHOULD reuse the existing UUID if the content hash matches an existing record.
+- Each note MUST be assigned a random UUID (v4) on first indexing.
+- The system MUST preserve the UUID across re-indexing of the same file.
 - The system MUST use the UUID as the stable public identifier for a note, not the file path.
 
 ### Metadata Extraction
 
 - The system MUST compute a SHA-256 hash of each file's content and store it in the index.
 - The system MUST detect sensitivity levels for each file by running the sensitivity detection algorithm against its full content.
-- The system MUST store the detected sensitivities (set), effective sensitivity (single value), file group name, and file path alongside the UUID and content hash.
+- If no sensitivities are detected, the system MUST add the file group's default sensitivity to the detected sensitivities.
+- The system MUST store the detected sensitivities (set), file group name, and file path alongside the UUID and content hash.
 - The system MUST store the full text content of each note in the index to support full-text search.
 - The system MUST record the file's modification time at the time of indexing.
 
@@ -56,14 +57,13 @@ Indexing discovers note files on disk, extracts sensitivity metadata, and persis
 
 ```
 NoteMetadata:
-  uuid: str                          # Deterministic UUID from content hash
+  uuid: str                          # Random v4 UUID
   file_path: str                     # Absolute path to the file
   file_group: str                    # Name of the file group that matched
   detected_sensitivities: set[str]   # All matched sensitivity levels
-  effective_sensitivity: str         # Single resolved sensitivity
   content_hash: str                  # SHA-256 of file content
-  indexed_at: datetime               # When this record was last updated
-  file_mtime: float                  # File modification time at index time
+  last_modified: datetime            # File modification time
+  last_indexed: datetime             # When this record was last updated
 ```
 
 ## Behavior
@@ -76,18 +76,13 @@ NoteMetadata:
    a. Check if an existing record exists and if `mtime` is unchanged; if so, skip.
    b. Read file content.
    c. Compute SHA-256 content hash.
-   d. Run sensitivity detection to get detected sensitivities and effective sensitivity.
-   e. Assign or reuse UUID.
-   f. Create/update `NoteMetadata`.
+   d. Run sensitivity detection to get detected sensitivities.
+   e. If no sensitivities detected, add file group default.
+   f. Assign or reuse UUID.
+   g. Create/update `NoteMetadata`.
 4. Batch-upsert all new/updated records (metadata + content) to the SQLite index.
 5. Delete index entries for paths no longer present in the glob expansion.
 6. Return statistics: `{indexed: int, skipped: int, errors: int}`.
-
-### UUID Assignment
-
-1. Compute SHA-256 of the file content.
-2. Use the first 32 hex characters as a UUID (formatted as UUID4 without version bits).
-3. If an existing record with the same content hash exists under a different path, reuse that UUID.
 
 ## Statistics
 

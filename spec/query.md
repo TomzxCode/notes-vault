@@ -10,7 +10,7 @@ The `query` command performs full-text search across notes accessible to an API 
 
 - The system MUST only search notes that the requesting API key has permission to access.
 - The system MUST resolve accessible notes by running access control checks before searching.
-- The system MUST filter FTS results to only those notes whose effective sensitivity is within the key's expanded access set.
+- The system MUST filter FTS results to notes whose detected sensitivities intersect with the key's expanded access set.
 
 ### Search Execution
 
@@ -42,7 +42,7 @@ The `query` command performs full-text search across notes accessible to an API 
 1. Resolve the API key and expand its access set.
 2. Retrieve all notes accessible to the key from the index.
 3. If no accessible notes exist, return empty results.
-4. Collect the set of effective sensitivity values from the accessible notes.
+4. Collect all detected sensitivity values from the accessible notes.
 5. Search the `notes_fts` table (FTS5) or `notes` table (`INSTR`) filtered to those sensitivities.
 6. For each matching note, extract matching lines from the stored content.
 7. Return results as `(NoteMetadata, [(line_number, line_text)])` tuples.

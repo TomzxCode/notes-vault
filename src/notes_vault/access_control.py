@@ -14,7 +14,7 @@ from notes_vault.storage import get_note_by_uuid, list_notes, log_access
 logger = structlog.get_logger()
 
 
-def resolve_key(raw_key: str) -> ApiKey | None:
+def resolve_key(raw_key: str | None) -> ApiKey | None:
     """
     Find an ApiKey by its raw secret value.
 
@@ -26,6 +26,8 @@ def resolve_key(raw_key: str) -> ApiKey | None:
     Returns:
         The matching ApiKey if found, None otherwise
     """
+    if raw_key is None:
+        return None
     config = load_config()
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
     for api_key in config.keys.values():
@@ -37,6 +39,9 @@ def resolve_key(raw_key: str) -> ApiKey | None:
 def check_access(api_key_name: str, note: NoteMetadata) -> bool:
     """
     Check if an API key has access to a note.
+
+    A note is accessible if ANY of its detected sensitivities matches
+    one of the key's accessible sensitivities.
 
     Args:
         api_key_name: Name of the API key
@@ -57,8 +62,8 @@ def check_access(api_key_name: str, note: NoteMetadata) -> bool:
     # Expand access using includes
     accessible_sensitivities = expand_access(api_key.sensitivities, config)
 
-    # Check if note's effective sensitivity is accessible
-    return note.effective_sensitivity in accessible_sensitivities
+    # Check if any of the note's detected sensitivities is accessible
+    return bool(note.detected_sensitivities & accessible_sensitivities)
 
 
 def get_accessible_notes(api_key_name: str) -> list[NoteMetadata]:
@@ -150,6 +155,6 @@ def get_note_if_accessible(api_key_name: str, note_uuid: UUID) -> NoteMetadata |
             "Access denied",
             api_key=api_key_name,
             uuid=str(note_uuid),
-            sensitivity=note.effective_sensitivity,
+            detected_sensitivities=sorted(note.detected_sensitivities),
         )
         return None

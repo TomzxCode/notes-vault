@@ -21,7 +21,8 @@ def test_check_access_granted(temp_config_dir, temp_notes_dir, sample_config):
     index_all()
 
     notes = list_notes()
-    public_note = next((n for n in notes if n.effective_sensitivity == "public"), None)
+    # Find a note with only public sensitivity
+    public_note = next((n for n in notes if n.detected_sensitivities == {"public"}), None)
     assert public_note is not None
 
     # Public key should have access to public note
@@ -35,11 +36,32 @@ def test_check_access_denied(temp_config_dir, temp_notes_dir, sample_config):
     index_all()
 
     notes = list_notes()
-    private_note = next((n for n in notes if n.effective_sensitivity == "private"), None)
+    # Find a note with only private sensitivity
+    private_note = next((n for n in notes if n.detected_sensitivities == {"private"}), None)
     assert private_note is not None
 
-    # Public key should NOT have access to private note
+    # Public key should NOT have access to private-only note
     assert check_access("public_key", private_note) is False
+
+
+def test_check_access_union_based(temp_config_dir, temp_notes_dir, sample_config):
+    """Test that union-based access works: a note with multiple tags is accessible to any matching key."""
+    init_db()
+    save_config(sample_config)
+    index_all()
+
+    notes = list_notes()
+    # Find the mixed note with both public and private tags
+    mixed_note = next((n for n in notes if "mixed" in n.file_path), None)
+    assert mixed_note is not None
+    assert "public" in mixed_note.detected_sensitivities
+    assert "private" in mixed_note.detected_sensitivities
+
+    # Public key should have access (via public tag)
+    assert check_access("public_key", mixed_note) is True
+
+    # Private/Admin key should have access (via private tag)
+    assert check_access("admin_key", mixed_note) is True
 
 
 def test_get_accessible_notes_admin(temp_config_dir, temp_notes_dir, sample_config):
@@ -50,37 +72,45 @@ def test_get_accessible_notes_admin(temp_config_dir, temp_notes_dir, sample_conf
 
     accessible = get_accessible_notes("admin_key")
 
-    # Admin key has private access which includes work and public
+    # Admin key has private access, can see all notes in the test config
     assert len(accessible) > 0
-
-    sensitivities = {note.effective_sensitivity for note in accessible}
-    assert "private" in sensitivities or "public" in sensitivities or "work" in sensitivities
 
 
 def test_get_accessible_notes_public(temp_config_dir, temp_notes_dir, sample_config):
-    """Test public key can only access public notes."""
+    """Test public key can access notes with public sensitivity (including mixed)."""
     init_db()
     save_config(sample_config)
     index_all()
 
     accessible = get_accessible_notes("public_key")
 
-    # Should only see public notes
+    # Should see public-only notes and notes with public tag (like mixed)
+    assert len(accessible) >= 2  # public.md and mixed.md
+
+    # Check that all accessible notes have public in their detected sensitivities
     for note in accessible:
-        assert note.effective_sensitivity == "public"
+        assert "public" in note.detected_sensitivities
 
 
 def test_get_accessible_notes_work(temp_config_dir, temp_notes_dir, sample_config):
-    """Test work key can access work and public notes."""
+    """Test work key can access work notes and notes with work tag."""
     init_db()
     save_config(sample_config)
     index_all()
 
     accessible = get_accessible_notes("work_key")
 
-    # Should see work and public notes (work includes public)
-    sensitivities = {note.effective_sensitivity for note in accessible}
-    assert "private" not in sensitivities
+    # Work key should see work.md and mixed.md (which has public, and work includes public)
+    # But not private.md (only has private tag)
+    assert len(accessible) >= 2
+
+    # Check that accessible notes have work or public tags
+    for note in accessible:
+        assert "work" in note.detected_sensitivities or "public" in note.detected_sensitivities
+
+    # Specifically, private-only notes should not be accessible
+    private_only = next((n for n in accessible if n.detected_sensitivities == {"private"}), None)
+    assert private_only is None
 
 
 def test_get_note_if_accessible_granted(temp_config_dir, temp_notes_dir, sample_config):
@@ -90,7 +120,7 @@ def test_get_note_if_accessible_granted(temp_config_dir, temp_notes_dir, sample_
     index_all()
 
     notes = list_notes()
-    public_note = next((n for n in notes if n.effective_sensitivity == "public"), None)
+    public_note = next((n for n in notes if n.detected_sensitivities == {"public"}), None)
     assert public_note is not None
 
     # Public key should be able to get public note
@@ -106,10 +136,10 @@ def test_get_note_if_accessible_denied(temp_config_dir, temp_notes_dir, sample_c
     index_all()
 
     notes = list_notes()
-    private_note = next((n for n in notes if n.effective_sensitivity == "private"), None)
+    private_note = next((n for n in notes if n.detected_sensitivities == {"private"}), None)
     assert private_note is not None
 
-    # Public key should NOT be able to get private note
+    # Public key should NOT be able to get private-only note
     result = get_note_if_accessible("public_key", private_note.uuid)
     assert result is None
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Sensitivity detection is the process of classifying a note by scanning its content for patterns defined by configured sensitivity levels. The result is a set of detected sensitivities and a single effective sensitivity used for access control.
+Sensitivity detection is the process of classifying a note by scanning its content for patterns defined by configured sensitivity levels. The result is a set of detected sensitivities that determines which API keys can access the note.
 
 ## Requirements
 
@@ -11,17 +11,14 @@ Sensitivity detection is the process of classifying a note by scanning its conte
 - The system MUST scan note content against every configured sensitivity level's `query` pattern using regex matching.
 - The system MUST record all sensitivity levels whose pattern matches the note content as the note's detected sensitivities.
 - The system MUST cache compiled regex patterns to avoid recompilation across multiple notes.
-- The system SHOULD treat detection as case-sensitive unless the query pattern explicitly uses case-insensitive flags.
+- The system SHOULD treat detection as case-insensitive for hashtag matching.
 - A note MAY match zero, one, or multiple sensitivity levels.
 
-### Effective Sensitivity Resolution
+### Default Sensitivity
 
-- The system MUST resolve exactly one effective sensitivity per note.
-- If a note matches multiple sensitivity levels, the system MUST apply a precedence order to select the effective sensitivity.
-- The default precedence order is: `private > work > family > friends > public > ai`.
-- If a note matches no sensitivity levels, the system MUST fall back to the file group's default sensitivity.
+- If a note matches zero sensitivity levels, the system MUST add the file group's default sensitivity to the detected sensitivities.
 - If the file group has no default sensitivity, the system MUST use the global default from `defaults.sensitivity`.
-- The effective sensitivity MUST be stored in the note's metadata alongside the full set of detected sensitivities.
+- This ensures every note has at least one sensitivity level for access control.
 
 ### Access Expansion
 
@@ -47,13 +44,7 @@ SensitivityLevel:
 1. For each configured sensitivity level, compile (or retrieve cached) regex from `query`.
 2. Apply each regex to the full note content using `re.search`.
 3. Collect all levels with a match as detected sensitivities.
-4. Pass detected sensitivities to effective sensitivity resolution.
-
-### Resolution Algorithm
-
-1. If detected sensitivities is empty, return the file group's default (or global default).
-2. Iterate through the precedence order; return the first level that appears in the detected set.
-3. If none match (e.g., a custom level not in the precedence list), return the first detected sensitivity.
+4. If no sensitivities detected, add the file group's default sensitivity (or global default).
 
 ### Expansion Algorithm
 
@@ -68,19 +59,18 @@ SensitivityLevel:
 
 Note content: `Meeting notes. #work`
 Detected: `{work}`
-Effective: `work`
 
 ### Multiple hashtags
 
 Note content: `#private #work`
 Detected: `{private, work}`
-Effective: `private` (higher precedence)
+Accessible by: keys with `private` OR `work` access
 
 ### No hashtags
 
 Note content: `Shopping list`
-Detected: `{}`
-Effective: file group default (e.g., `private`)
+Detected: `{private}` (file group default)
+Accessible by: keys with `private` access
 
 ### Access expansion
 

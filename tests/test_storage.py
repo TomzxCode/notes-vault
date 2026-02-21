@@ -32,7 +32,6 @@ def test_upsert_and_get_note(temp_config_dir):
         file_path="/test/note.md",
         file_group="notes",
         detected_sensitivities={"private"},
-        effective_sensitivity="private",
         last_modified=datetime.now(),
         last_indexed=datetime.now(),
         content_hash="abc123",
@@ -44,7 +43,7 @@ def test_upsert_and_get_note(temp_config_dir):
     retrieved = get_note_by_uuid(note_uuid)
     assert retrieved is not None
     assert retrieved.uuid == note_uuid
-    assert retrieved.effective_sensitivity == "private"
+    assert retrieved.detected_sensitivities == {"private"}
 
     # Retrieve by path
     retrieved_by_path = get_note_by_path("/test/note.md")
@@ -64,7 +63,6 @@ def test_list_notes_filtered(temp_config_dir):
             file_path=f"/test/note{i}.md",
             file_group="notes",
             detected_sensitivities={sensitivity},
-            effective_sensitivity=sensitivity,
             last_modified=datetime.now(),
             last_indexed=datetime.now(),
             content_hash=f"hash{i}",
@@ -78,7 +76,7 @@ def test_list_notes_filtered(temp_config_dir):
     # List only public notes
     public_notes = list_notes({"public"})
     assert len(public_notes) == 1
-    assert public_notes[0].effective_sensitivity == "public"
+    assert public_notes[0].detected_sensitivities == {"public"}
 
 
 def test_delete_note(temp_config_dir):
@@ -90,7 +88,6 @@ def test_delete_note(temp_config_dir):
         file_path="/test/delete.md",
         file_group="notes",
         detected_sensitivities=set(),
-        effective_sensitivity="private",
         last_modified=datetime.now(),
         last_indexed=datetime.now(),
         content_hash="abc",

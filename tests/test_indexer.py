@@ -32,12 +32,12 @@ def test_index_detects_sensitivities(temp_config_dir, temp_notes_dir, sample_con
     # Find the private note
     private_note = next((n for n in notes if "private.md" in n.file_path), None)
     assert private_note is not None
-    assert private_note.effective_sensitivity == "private"
+    assert "private" in private_note.detected_sensitivities
 
     # Find the public note
     public_note = next((n for n in notes if "public.md" in n.file_path), None)
     assert public_note is not None
-    assert public_note.effective_sensitivity == "public"
+    assert "public" in public_note.detected_sensitivities
 
 
 def test_index_mixed_tags(temp_config_dir, temp_notes_dir, sample_config):
@@ -54,8 +54,6 @@ def test_index_mixed_tags(temp_config_dir, temp_notes_dir, sample_config):
     assert mixed_note is not None
     assert "public" in mixed_note.detected_sensitivities
     assert "private" in mixed_note.detected_sensitivities
-    # Should use precedence (private > public)
-    assert mixed_note.effective_sensitivity == "private"
 
 
 def test_index_no_tags(temp_config_dir, temp_notes_dir, sample_config):
@@ -70,9 +68,8 @@ def test_index_no_tags(temp_config_dir, temp_notes_dir, sample_config):
     # Find the no_tags note
     no_tags_note = next((n for n in notes if "no_tags.md" in n.file_path), None)
     assert no_tags_note is not None
-    assert len(no_tags_note.detected_sensitivities) == 0
-    # Should use file group default
-    assert no_tags_note.effective_sensitivity == "private"
+    # Should use file group default (private) when no tags detected
+    assert "private" in no_tags_note.detected_sensitivities
 
 
 def test_index_incremental(temp_config_dir, temp_notes_dir, sample_config):

@@ -41,13 +41,14 @@ def list_notes(
 
     table = Table(title=f"Notes accessible by '{api_key.key_name}'")
     table.add_column("UUID", style="cyan")
-    table.add_column("Sensitivity", style="green")
+    table.add_column("Sensitivities", style="green")
     table.add_column("Group", style="yellow")
 
     for note in notes:
+        sensitivities_str = ", ".join(sorted(note.detected_sensitivities))
         table.add_row(
             str(note.uuid),
-            note.effective_sensitivity,
+            sensitivities_str,
             note.file_group,
         )
 
@@ -109,7 +110,10 @@ def query(
         console.print("[yellow]No accessible notes found[/yellow]")
         return
 
-    accessible_sensitivities = {note.effective_sensitivity for note in notes}
+    # Collect all detected sensitivities from accessible notes
+    accessible_sensitivities = set()
+    for note in notes:
+        accessible_sensitivities.update(note.detected_sensitivities)
 
     matched_notes = search_notes_fts(query_string, accessible_sensitivities, case_sensitive)
 
@@ -123,8 +127,9 @@ def query(
         )
 
         for note, matching_lines in matched_notes:
+            sensitivities_str = ", ".join(sorted(note.detected_sensitivities))
             console.print(f"[cyan]UUID:[/cyan] {note.uuid}")
-            console.print(f"[cyan]Sensitivity:[/cyan] {note.effective_sensitivity}")
+            console.print(f"[cyan]Sensitivities:[/cyan] {sensitivities_str}")
             console.print(f"[cyan]Group:[/cyan] {note.file_group}")
             console.print(f"[cyan]Matches:[/cyan] {len(matching_lines)} line(s)")
 

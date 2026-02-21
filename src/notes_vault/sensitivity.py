@@ -1,4 +1,4 @@
-"""Hashtag detection and sensitivity resolution logic."""
+"""Hashtag detection and sensitivity access logic."""
 
 import re
 
@@ -28,46 +28,6 @@ def detect_sensitivities(content: str, config: Config) -> set[str]:
             detected.add(name)
 
     return detected
-
-
-def resolve_effective_sensitivity(
-    detected_sensitivities: set[str], file_group_default: str, config: Config
-) -> str:
-    """
-    Resolve the effective sensitivity level from detected hashtags.
-
-    Precedence rules:
-    1. If multiple hashtags detected, use precedence order (most restrictive wins)
-    2. If no hashtags detected, use file group default
-    3. Default precedence order: private > work > family > friends > public > ai
-
-    Args:
-        detected_sensitivities: Set of detected sensitivity level names
-        file_group_default: Default sensitivity for the file group
-        config: Application configuration
-
-    Returns:
-        The effective sensitivity level name
-    """
-    if not detected_sensitivities:
-        return file_group_default
-
-    if len(detected_sensitivities) == 1:
-        return next(iter(detected_sensitivities))
-
-    # Define default precedence order (most restrictive first)
-    default_precedence = ["private", "work", "family", "friends", "public", "ai"]
-
-    # Use custom precedence from config if available
-    precedence = config.defaults.get("precedence", default_precedence)
-
-    # Return the first match in precedence order
-    for level in precedence:
-        if level in detected_sensitivities:
-            return level
-
-    # Fallback: return any detected sensitivity
-    return next(iter(detected_sensitivities))
 
 
 def expand_access(api_key_sensitivities: set[str], config: Config) -> set[str]:
