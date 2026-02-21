@@ -1,0 +1,44 @@
+[project]
+name = "notes-vault"
+version = "0.1.0"
+description = "Privacy-sensitive notes CLI tool with hashtag-based access control"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "cyclopts>=4.5.2",
+    "pydantic>=2.12.5",
+    "pyyaml>=6.0.3",
+    "rich>=14.3.2",
+    "structlog>=25.5.0",
+]
+
+[project.scripts]
+notes-vault = "notes_vault.cli:main"
+notes-vault-admin = "notes_vault.cli:main"
+notes-vault-user = "notes_vault.cli:main_user"
+nv = "notes_vault.cli:main"
+nva = "notes_vault.cli:main"
+nvu = "notes_vault.cli:main_user"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.15.0",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.uv]
+package = true
