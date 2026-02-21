@@ -10,7 +10,9 @@ import cyclopts
 from rich.console import Console
 from rich.table import Table
 
-from notes_vault.access_control import get_accessible_notes, get_note_if_accessible, resolve_key
+from notes_vault.access_control import get_note_if_accessible, resolve_key
+from notes_vault.config import load_config
+from notes_vault.sensitivity import expand_access
 from notes_vault.models import ApiKey
 from notes_vault.storage import init_db, search_notes_fts
 
@@ -104,16 +106,8 @@ def query(
         console.print("[red]Error:[/red] Invalid API key")
         return
 
-    notes = get_accessible_notes(api_key.key_name)
-
-    if not notes:
-        console.print("[yellow]No accessible notes found[/yellow]")
-        return
-
-    # Collect all detected sensitivities from accessible notes
-    accessible_sensitivities = set()
-    for note in notes:
-        accessible_sensitivities.update(note.detected_sensitivities)
+    config = load_config()
+    accessible_sensitivities = expand_access(api_key.sensitivities, config)
 
     matched_notes = search_notes_fts(query_string, accessible_sensitivities, case_sensitive)
 
