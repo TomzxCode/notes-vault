@@ -6,7 +6,6 @@ from notes_vault.commands.user import query
 from notes_vault.config import save_config
 from notes_vault.indexer import index_all
 from notes_vault.storage import init_db
-
 from tests.helpers import TEST_RAW_KEYS
 
 

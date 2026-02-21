@@ -2,7 +2,12 @@
 
 import hashlib
 
-from notes_vault.access_control import check_access, get_accessible_notes, get_note_if_accessible, resolve_key
+from notes_vault.access_control import (
+    check_access,
+    get_accessible_notes,
+    get_note_if_accessible,
+    resolve_key,
+)
 from notes_vault.config import save_config
 from notes_vault.indexer import index_all
 from notes_vault.models import ApiKey

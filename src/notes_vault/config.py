@@ -7,10 +7,21 @@ import yaml
 
 from notes_vault.models import ApiKey, Config, FileGroup, SensitivityLevel
 
+APP_NAME = "notes-vault"
+
 
 def get_config_dir() -> Path:
-    """Get the configuration directory path."""
-    return Path("~/.config/notes-vault").expanduser()
+    """Get the XDG config directory path (~/.config/notes-vault by default)."""
+    xdg_config_home = os.environ.get("XDG_CONFIG_HOME", "")
+    base = Path(xdg_config_home) if xdg_config_home else Path.home() / ".config"
+    return base / APP_NAME
+
+
+def get_data_dir() -> Path:
+    """Get the XDG data directory path (~/.local/share/notes-vault by default)."""
+    xdg_data_home = os.environ.get("XDG_DATA_HOME", "")
+    base = Path(xdg_data_home) if xdg_data_home else Path.home() / ".local" / "share"
+    return base / APP_NAME
 
 
 def get_config_path() -> Path:
@@ -20,12 +31,12 @@ def get_config_path() -> Path:
 
 def get_db_path() -> Path:
     """Get the index.db file path."""
-    return get_config_dir() / "index.db"
+    return get_data_dir() / "index.db"
 
 
 def get_log_path() -> Path:
     """Get the access.log file path."""
-    return get_config_dir() / "access.log"
+    return get_data_dir() / "access.log"
 
 
 def load_config() -> Config:

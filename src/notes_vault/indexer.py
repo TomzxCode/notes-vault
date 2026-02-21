@@ -1,6 +1,7 @@
 """File discovery and indexing logic."""
 
 import hashlib
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
@@ -93,9 +94,38 @@ def index_file(
     return note
 
 
-def index_all() -> dict[str, int]:
+def _collect_files(
+    config: Config,
+    on_file_found: Callable[[], None] | None = None,
+) -> list[tuple[Path, str, str]]:
+    """Collect all files from configured file groups, returning (path, group_name, sensitivity)."""
+    result = []
+    for file_group_name, file_group in config.files.items():
+        logger.info("Scanning file group", group=file_group_name, pattern=file_group.path)
+        pattern = Path(file_group.path).expanduser()
+        if "**" in str(pattern):
+            base_path = Path(str(pattern).split("**")[0])
+            relative_pattern = str(pattern).replace(str(base_path), "").lstrip("/")
+            files = base_path.glob(relative_pattern)
+        else:
+            files = Path().glob(str(pattern))
+        for file_path in files:
+            if file_path.is_file():
+                result.append((file_path, file_group_name, file_group.sensitivity))
+                if on_file_found:
+                    on_file_found()
+    return result
+
+
+def index_all(
+    progress_callback: Callable[[int, int], None] | None = None,
+    on_file_found: Callable[[], None] | None = None,
+) -> dict[str, int]:
     """
     Index all files from configured file groups.
+
+    Args:
+        progress_callback: Optional callback called with (current, total) after each file.
 
     Returns:
         Dictionary with statistics: indexed, skipped, errors
@@ -110,42 +140,35 @@ def index_all() -> dict[str, int]:
     # Load all existing notes upfront (one DB query instead of one per file)
     existing_notes = {n.file_path: n for n in list_notes()}
 
-    for file_group_name, file_group in config.files.items():
-        logger.info("Indexing file group", group=file_group_name, pattern=file_group.path)
+    # Collect all files first so we know the total for progress reporting
+    all_files = _collect_files(config, on_file_found=on_file_found)
+    total = len(all_files)
 
-        # Expand glob pattern
-        pattern = Path(file_group.path).expanduser()
-        if "**" in str(pattern):
-            # Handle recursive glob
-            base_path = Path(str(pattern).split("**")[0])
-            relative_pattern = str(pattern).replace(str(base_path), "").lstrip("/")
-            files = base_path.glob(relative_pattern)
-        else:
-            files = Path().glob(str(pattern))
+    for current, (file_path, file_group_name, file_group_sensitivity) in enumerate(
+        all_files, start=1
+    ):
+        path_str = str(file_path)
+        indexed_paths.add(path_str)
+        existing_note = existing_notes.get(path_str)
 
-        for file_path in files:
-            if not file_path.is_file():
-                continue
-
-            path_str = str(file_path)
-            indexed_paths.add(path_str)
-            existing_note = existing_notes.get(path_str)
-
-            try:
-                if should_reindex(file_path, existing_note):
-                    note = index_file(
-                        file_path, file_group_name, file_group.sensitivity, config, existing_note
-                    )
-                    if note is None:
-                        stats["errors"] += 1
-                    else:
-                        notes_to_upsert.append(note)
-                        stats["indexed"] += 1
+        try:
+            if should_reindex(file_path, existing_note):
+                note = index_file(
+                    file_path, file_group_name, file_group_sensitivity, config, existing_note
+                )
+                if note is None:
+                    stats["errors"] += 1
                 else:
-                    stats["skipped"] += 1
-            except Exception as e:
-                logger.error("Failed to index file", file_path=str(file_path), error=str(e))
-                stats["errors"] += 1
+                    notes_to_upsert.append(note)
+                    stats["indexed"] += 1
+            else:
+                stats["skipped"] += 1
+        except Exception as e:
+            logger.error("Failed to index file", file_path=str(file_path), error=str(e))
+            stats["errors"] += 1
+
+        if progress_callback:
+            progress_callback(current, total)
 
     # Batch upsert all indexed notes in a single transaction
     upsert_notes_batch(notes_to_upsert)

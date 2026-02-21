@@ -93,7 +93,9 @@ def query(
     query_string: Annotated[str, cyclopts.Parameter(help="Search query")],
     key: Annotated[str | None, cyclopts.Parameter(help="API key")] = None,
     case_sensitive: Annotated[bool, cyclopts.Parameter(help="Case sensitive search")] = False,
-    with_context: Annotated[bool, cyclopts.Parameter(help="Show match details and line content")] = False,
+    with_context: Annotated[
+        bool, cyclopts.Parameter(help="Show match details and line content")
+    ] = False,
 ):
     """Search for notes matching a query within accessible notes."""
     init_db()

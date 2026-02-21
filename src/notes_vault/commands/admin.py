@@ -4,6 +4,7 @@ from typing import Annotated
 
 import cyclopts
 from rich.console import Console
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
 from notes_vault.config import load_config, save_config
@@ -45,9 +46,27 @@ def defaults(
 def index():
     """Manually trigger indexing of all configured file groups."""
     init_db()
-    console.print("[cyan]Starting indexing...[/cyan]")
 
-    stats = index_all()
+    found_count = 0
+
+    with Progress(
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Scanning...", total=None)
+
+        def on_file_found() -> None:
+            nonlocal found_count
+            found_count += 1
+            progress.update(task, total=found_count)
+
+        def on_progress(current: int, total: int) -> None:
+            progress.update(task, description="Indexing files...", completed=current, total=total)
+
+        stats = index_all(progress_callback=on_progress, on_file_found=on_file_found)
 
     console.print("\n[green]Indexing complete![/green]")
     console.print(f"  Indexed: {stats['indexed']}")
