@@ -1,7 +1,7 @@
 [project]
 name = "notes-vault"
 version = "0.1.0"
-description = "Privacy-sensitive notes CLI tool with hashtag-based access control"
+description = "Privacy-sensitive notes sync CLI tool"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -14,11 +14,7 @@ dependencies = [
 
 [project.scripts]
 notes-vault = "notes_vault.cli:main"
-notes-vault-admin = "notes_vault.cli:main"
-notes-vault-user = "notes_vault.cli:main_user"
 nv = "notes_vault.cli:main"
-nva = "notes_vault.cli:main"
-nvu = "notes_vault.cli:main_user"
 
 [dependency-groups]
 dev = [

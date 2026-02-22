@@ -15,7 +15,6 @@ console = Console()
 def add(
     name: Annotated[str, cyclopts.Parameter(help="File group name")],
     path: Annotated[str, cyclopts.Parameter(help="Glob pattern for file paths")],
-    sensitivity: Annotated[str, cyclopts.Parameter(help="Default sensitivity level")],
 ):
     """Add a new file group."""
     config = load_config()
@@ -24,12 +23,11 @@ def add(
         console.print(f"[red]Error:[/red] File group '{name}' already exists")
         return
 
-    config.files[name] = FileGroup(name=name, path=path, sensitivity=sensitivity)
+    config.files[name] = FileGroup(name=name, path=path)
     save_config(config)
 
     console.print(f"[green]✓[/green] File group '{name}' added")
     console.print(f"  Path: {path}")
-    console.print(f"  Sensitivity: {sensitivity}")
 
 
 def list_files():
@@ -43,10 +41,9 @@ def list_files():
     table = Table(title="File Groups")
     table.add_column("Name", style="cyan")
     table.add_column("Path", style="blue")
-    table.add_column("Sensitivity", style="green")
 
     for name, file_group in config.files.items():
-        table.add_row(name, file_group.path, file_group.sensitivity)
+        table.add_row(name, file_group.path)
 
     console.print(table)
 
@@ -54,7 +51,6 @@ def list_files():
 def update(
     name: Annotated[str, cyclopts.Parameter(help="File group name")],
     path: Annotated[str | None, cyclopts.Parameter(help="New glob pattern")] = None,
-    sensitivity: Annotated[str | None, cyclopts.Parameter(help="New sensitivity level")] = None,
 ):
     """Update an existing file group."""
     config = load_config()
@@ -65,8 +61,6 @@ def update(
 
     if path:
         config.files[name].path = path
-    if sensitivity:
-        config.files[name].sensitivity = sensitivity
 
     save_config(config)
     console.print(f"[green]✓[/green] File group '{name}' updated")

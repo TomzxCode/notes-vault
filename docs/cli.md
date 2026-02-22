@@ -1,6 +1,6 @@
 # CLI Reference
 
-Notes Vault is invoked as `nv` (or `notes-vault`). A user-only variant `nvu` (or `notes-vault-user`) exposes only the read commands.
+Notes Vault is invoked as `nv` (or `notes-vault`).
 
 ## Global Options
 
@@ -13,33 +13,39 @@ nv --version    Show version
 
 ## Admin Commands
 
-### `nv defaults`
+### `nv sync`
 
-Show or set the default sensitivity level applied to notes with no matching hashtag.
+Export files to consumer target directories. Deletes and recreates each target directory from scratch.
 
 ```bash
-# Show current default
-nv defaults
+# Sync all consumers
+nv sync
 
-# Set default sensitivity
-nv defaults --sensitivity <level>
+# Sync a specific consumer
+nv sync <consumer>
+
+# Sync with a specific number of parallel workers
+nv sync --workers 4
 ```
+
+**Arguments:**
+
+| Argument | Description |
+|----------|-------------|
+| `consumer` | Consumer name (optional; syncs all consumers if omitted) |
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `--sensitivity LEVEL` | Name of the sensitivity level to set as default |
+| `--workers N` | Number of parallel workers (default: auto) |
 
----
+**Output:**
 
-### `nv index`
-
-Scan all configured file groups and update the metadata index. Only re-scans files whose modification time has changed.
-
-```bash
-nv index
-```
+For each consumer, prints:
+- `Exported` - number of files copied to the target
+- `Skipped` - number of files filtered out by query rules
+- `Errors` - number of files that failed to read
 
 ---
 
@@ -50,7 +56,7 @@ nv index
 Add a new file group.
 
 ```bash
-nv files add <name> --path <glob-pattern> --sensitivity <level>
+nv files add <name> <path>
 ```
 
 **Arguments:**
@@ -58,18 +64,12 @@ nv files add <name> --path <glob-pattern> --sensitivity <level>
 | Argument | Description |
 |----------|-------------|
 | `name` | Unique name for this file group |
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--path PATTERN` | Glob pattern matching the note files (e.g., `~/notes/**/*.md`) |
-| `--sensitivity LEVEL` | Default sensitivity for notes in this group |
+| `path` | Glob pattern matching the note files (e.g., `~/notes/**/*.md`) |
 
 **Example:**
 
 ```bash
-nv files add personal --path "~/Documents/notes/**/*.md" --sensitivity private
+nv files add personal "~/Documents/notes/**/*.md"
 ```
 
 ---
@@ -89,7 +89,7 @@ nv files list
 Update an existing file group.
 
 ```bash
-nv files update <name> [--path <glob-pattern>] [--sensitivity <level>]
+nv files update <name> [--path <glob-pattern>]
 ```
 
 **Arguments:**
@@ -103,7 +103,6 @@ nv files update <name> [--path <glob-pattern>] [--sensitivity <level>]
 | Option | Description |
 |--------|-------------|
 | `--path PATTERN` | New glob pattern |
-| `--sensitivity LEVEL` | New default sensitivity |
 
 ---
 
@@ -117,220 +116,85 @@ nv files delete <name>
 
 ---
 
-## API Key Commands
+## Consumer Commands
 
-### `nv keys add`
+### `nv consumers add`
 
-Create a new API key. The raw key is printed once - store it securely.
+Add a new consumer.
 
 ```bash
-nv keys add <name> --sensitivities <level1>[,<level2>,...]
+nv consumers add <name> <target> [--include-queries <patterns>] [--exclude-queries <patterns>] [--rename]
 ```
 
 **Arguments:**
 
 | Argument | Description |
 |----------|-------------|
-| `name` | Unique name for this key |
+| `name` | Unique name for this consumer |
+| `target` | Target directory path where files will be exported |
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `--sensitivities LEVELS` | Comma-separated list of sensitivity levels this key can access |
+| `--include-queries PATTERNS` | Comma-separated regex patterns; at least one must match for export |
+| `--exclude-queries PATTERNS` | Comma-separated regex patterns; any match prevents export |
+| `--rename` | Rename exported files to deterministic UUIDs (default: false) |
 
 **Example:**
 
 ```bash
-nv keys add admin_key --sensitivities private
-nv keys add work_key --sensitivities work,public
+# Work assistant that sees #work notes but not #private ones
+nv consumers add work-assistant "~/exports/work" \
+  --include-queries "#work,#project" \
+  --exclude-queries "#private" \
+  --rename
+
+# Personal assistant that sees all notes
+nv consumers add personal "~/exports/personal" --include-queries ".*"
 ```
 
 ---
 
-### `nv keys list`
+### `nv consumers list`
 
-List all API keys (names and assigned sensitivities, not raw values).
+List all configured consumers.
 
 ```bash
-nv keys list
+nv consumers list
 ```
 
 ---
 
-### `nv keys update`
+### `nv consumers update`
 
-Update the sensitivities for an existing key.
-
-```bash
-nv keys update <name> [--sensitivities <level1>[,<level2>,...]]
-```
-
----
-
-### `nv keys delete`
-
-Delete an API key.
+Update an existing consumer.
 
 ```bash
-nv keys delete <name>
-```
-
----
-
-## Sensitivity Level Commands
-
-### `nv sensitivities add`
-
-Create a new sensitivity level.
-
-```bash
-nv sensitivities add <name> --description <text> --query <regex>
+nv consumers update <name> [--target <dir>] [--include-queries <patterns>] [--exclude-queries <patterns>] [--rename/--no-rename]
 ```
 
 **Arguments:**
 
 | Argument | Description |
 |----------|-------------|
-| `name` | Unique name for this sensitivity level |
+| `name` | Name of the consumer to update |
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `--description TEXT` | Human-readable description |
-| `--query REGEX` | Regex pattern matched against note content |
-
-**Example:**
-
-```bash
-nv sensitivities add private --description "Private notes" --query "#private"
-```
+| `--target DIR` | New target directory |
+| `--include-queries PATTERNS` | New comma-separated include patterns (replaces existing) |
+| `--exclude-queries PATTERNS` | New comma-separated exclude patterns (replaces existing) |
+| `--rename / --no-rename` | Enable or disable UUID renaming |
 
 ---
 
-### `nv sensitivities list`
+### `nv consumers delete`
 
-List all configured sensitivity levels.
-
-```bash
-nv sensitivities list
-```
-
----
-
-### `nv sensitivities update`
-
-Update a sensitivity level's description or query.
+Delete a consumer.
 
 ```bash
-nv sensitivities update <name> [--description <text>] [--query <regex>]
-```
-
----
-
-### `nv sensitivities delete`
-
-Delete a sensitivity level.
-
-```bash
-nv sensitivities delete <name>
-```
-
----
-
-### `nv sensitivities include`
-
-Add an include relationship between two sensitivity levels. After this, a key with access to `<name>` will also be able to access notes at `<other-level>`.
-
-```bash
-nv sensitivities include <name> --include-level <other-level>
-```
-
-**Example:**
-
-```bash
-# private includes work (private key can see work notes)
-nv sensitivities include private --include-level work
-```
-
----
-
-## User Commands
-
-These commands are also available via the `nvu` / `notes-vault-user` entry points.
-
-### `nv list`
-
-List notes accessible to the given API key.
-
-```bash
-nv list --key <raw-key>
-```
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--key KEY` | Raw API key value (or set `NOTES_VAULT_KEY` env var instead) |
-
-Output columns: UUID, sensitivity, file group.
-
----
-
-### `nv get`
-
-Print the content of a note to stdout.
-
-```bash
-nv get --key <raw-key> <uuid>
-```
-
-**Arguments:**
-
-| Argument | Description |
-|----------|-------------|
-| `uuid` | UUID of the note to retrieve |
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--key KEY` | Raw API key value (or set `NOTES_VAULT_KEY` env var) |
-
----
-
-### `nv query`
-
-Search note content using SQLite FTS5. Only searches notes accessible to the given key.
-
-```bash
-nv query --key <raw-key> <search-string> [options]
-```
-
-**Arguments:**
-
-| Argument | Description |
-|----------|-------------|
-| `search-string` | Text or pattern to search for |
-
-**Options:**
-
-| Option | Description |
-|--------|-------------|
-| `--key KEY` | Raw API key value (or set `NOTES_VAULT_KEY` env var) |
-| `--case-sensitive` | Enable case-sensitive matching (default: case-insensitive) |
-| `--with-context` | Show match details and line content (default: print only UUIDs) |
-
-**Examples:**
-
-```bash
-# Search for "meeting" in accessible notes (prints matching UUIDs)
-nv query --key mykey "meeting"
-
-# Case-sensitive search
-nv query --key mykey "TODO" --case-sensitive
-
-# Show match details including line content
-nv query --key mykey "project alpha" --with-context
+nv consumers delete <name>
 ```

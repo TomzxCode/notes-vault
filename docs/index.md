@@ -1,22 +1,18 @@
 # Notes Vault
 
-**Notes Vault** is a privacy-sensitive notes management CLI tool with hashtag-based access control.
+**Notes Vault** is a privacy-sensitive notes sync CLI tool with pattern-based access control.
 
 ## What is Notes Vault?
 
-Notes Vault (`nv`) lets you organize your markdown notes into sensitivity levels and control access via API keys. It automatically classifies notes based on hashtags like `#private`, `#work`, or `#public`, then enforces access permissions when notes are retrieved or searched.
+Notes Vault (`nv`) exports your notes to consumer-specific directories based on regex query rules. Each consumer (e.g. an LLM assistant, a work tool) gets its own target directory containing only the notes it is allowed to see. Each consumer defines which files it receives using include and exclude patterns matched against file content.
 
 ## Key Features
 
-- **Hashtag-based classification** - Notes are automatically classified by scanning for hashtags that match configured sensitivity patterns
-- **API key access control** - Each API key grants access to specific sensitivity levels
-- **Hierarchical access** - Sensitivity levels can include other levels (e.g., `private` also grants access to `work` and `public` notes)
-- **File group management** - Organize notes using glob patterns
-- **Incremental indexing** - Only re-scans files that have changed since the last index
-- **Full-text search** - SQLite FTS5-powered search across accessible notes, no external tools required
-- **SQLite store** - Note metadata and content indexed for fast querying and search
-- **YAML configuration** - Human-readable, editable configuration
-- **Access logging** - Audit trail of all access attempts
+- **Include/exclude queries** - Each consumer specifies regex patterns to include and exclude files by content
+- **Consumer directories** - Each consumer gets a clean export of only its matching notes
+- **Optional UUID renaming** - Rename exported files to deterministic UUIDs to hide filenames from consumers
+- **File group management** - Organize source notes using glob patterns
+- **YAML configuration** - Human-readable, hand-editable configuration
 
 ## How It Works
 
@@ -24,41 +20,35 @@ Notes Vault (`nv`) lets you organize your markdown notes into sensitivity levels
 Notes (markdown files)
         │
         ▼
-  Indexer scans files
+  File groups (glob patterns) collect files
         │
         ▼
-  Sensitivity detection (hashtag matching)
+  Query matching: exclude_queries checked first, then include_queries
         │
         ▼
-  Metadata stored in SQLite (UUID, sensitivity, group, hash)
-        │
-        ▼
-  API key → access control check → filtered results
+  Matching files copied to consumer target directory
 ```
 
 ## Quick Example
 
 ```bash
-# Set up sensitivity levels
-nv sensitivities add private --description "Private notes" --query "#private"
-nv sensitivities add public --description "Public notes" --query "#public"
-nv sensitivities include private --include-level public
-
 # Add your notes directory
-nv files add mynotes --path "~/notes/**/*.md" --sensitivity private
+nv files add mynotes "~/notes/**/*.md"
 
-# Create an API key
-nv keys add mykey --sensitivities private
+# Add a consumer - sees all #work notes except #private ones
+nv consumers add work-assistant "~/exports/work" \
+  --include-queries "#work" \
+  --exclude-queries "#private" \
+  --rename
 
-# Index and list notes
-nv index
-nv list --key mykey
+# Sync
+nv sync
 ```
 
 ## Next Steps
 
-- [Installation](installation.md) - Install Notes Vault and its dependencies
+- [Installation](installation.md) - Install Notes Vault
 - [Quick Start](quickstart.md) - Get up and running in minutes
-- [Concepts](concepts.md) - Understand sensitivity levels, access control, and indexing
+- [Concepts](concepts.md) - Understand consumers and sync
 - [Configuration](configuration.md) - Full configuration reference
 - [CLI Reference](cli.md) - All commands and options

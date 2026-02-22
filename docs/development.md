@@ -16,30 +16,20 @@ This installs all production and development dependencies into a virtual environ
 notes-vault/
 ├── src/notes_vault/
 │   ├── __init__.py           # Package init (empty)
-│   ├── cli.py                # CLI entry points (Cyclopts)
+│   ├── cli.py                # CLI entry point (Cyclopts)
 │   ├── config.py             # YAML config load/save
 │   ├── models.py             # Pydantic data models
-│   ├── storage.py            # SQLite database layer
-│   ├── sensitivity.py        # Hashtag detection logic
-│   ├── indexer.py            # File discovery and indexing
-│   ├── access_control.py     # Permission checking
+│   ├── syncer.py             # File discovery, query matching, and export
 │   └── commands/
 │       ├── __init__.py
-│       ├── admin.py          # defaults, index commands
-│       ├── files.py          # file group CRUD
-│       ├── keys.py           # API key management
-│       ├── sensitivity.py    # sensitivity level management
-│       └── user.py           # list, get, query commands
+│       ├── admin.py          # sync command
+│       ├── consumers.py      # consumer CRUD
+│       └── files.py          # file group CRUD
 ├── tests/
 │   ├── conftest.py           # pytest fixtures
-│   ├── helpers.py            # test constants
-│   ├── test_access_control.py
 │   ├── test_config.py
-│   ├── test_indexer.py
 │   ├── test_models.py
-│   ├── test_query.py
-│   ├── test_sensitivity.py
-│   └── test_storage.py
+│   └── test_syncer.py
 ├── pyproject.toml
 └── mkdocs.yml
 ```
@@ -51,7 +41,7 @@ notes-vault/
 uv run pytest -v
 
 # Run a specific test file
-uv run pytest tests/test_access_control.py -v
+uv run pytest tests/test_syncer.py -v
 
 # Run with coverage report
 uv run pytest --cov=notes_vault --cov-report=html
@@ -88,60 +78,33 @@ uv run mkdocs build
 
 All data structures are defined as Pydantic models:
 
-- `SensitivityLevel` - name, description, regex query, includes set
-- `FileGroup` - name, glob path, default sensitivity
-- `ApiKey` - name, SHA-256 hashed key, sensitivities set
-- `NoteMetadata` - UUID, path, group, detected sensitivities, timestamps, content hash
+- `FileGroup` - name and glob path
+- `Consumer` - name, target directory, include/exclude query lists, rename flag
 - `Config` - top-level config container
-- `AccessLogEntry` - timestamp, key, action, UUID, granted flag
 
 ### Config (`config.py`)
 
-Loads and saves `config.yaml` using PyYAML. The config directory is resolved via `VAULT_CONFIG_DIR` or defaults to `~/.vault/`.
+Loads and saves `config.yaml` using PyYAML. The config directory is resolved via `XDG_CONFIG_HOME` or defaults to `~/.config/notes-vault/`.
 
-### Storage (`storage.py`)
+### Syncer (`syncer.py`)
 
-Wraps a SQLite database for note metadata and content. Provides:
-
-- `upsert_note` / `upsert_notes_batch` - insert or update note metadata and content
-- `list_notes` - query notes, optionally filtered by sensitivity
-- `search_notes_fts` - full-text search using FTS5 (case-insensitive) or `INSTR` (case-sensitive)
-- `log_access` - write access log entries
-
-### Sensitivity (`sensitivity.py`)
-
-- `detect_sensitivities` - scans content against all level regex patterns
-- `expand_access` - resolves the full set of accessible levels via includes
-
-### Indexer (`indexer.py`)
-
-- `index_all` - discovers all files, checks mtimes, scans changed files, batch-upserts to SQLite
-- `index_file` - indexes a single file: reads content, detects sensitivity, creates `NoteMetadata`
-- `calculate_content_hash` - SHA-256 of file content
-
-### Access Control (`access_control.py`)
-
-- `resolve_key` - resolve API key from raw secret value by comparing SHA-256 hash
-- `check_access` - determine if a key can access a note (checks if detected sensitivities intersect with key's expanded access)
-- `get_accessible_notes` - list all notes accessible to a key
-- `get_note_if_accessible` - retrieve a note by UUID if accessible
+- `sync_consumer` - exports files matching a consumer's queries to their target directory
+- `sync_all` - syncs all consumers, or just one if a name is specified
+- `_collect_files` - discovers all files from configured file groups in parallel
+- `_matches_any` - tests content against a list of regex patterns
+- `_file_uuid` - generates a deterministic UUID5 from an absolute file path
 
 ### CLI (`cli.py`)
 
-Uses [Cyclopts](https://github.com/BrianPugh/cyclopts) for CLI parsing. Two entry points:
-
-- `main()` - full admin + user CLI (`nv`, `nva`, `notes-vault`, `notes-vault-admin`)
-- `main_user()` - user-only CLI (`nvu`, `notes-vault-user`)
+Uses [Cyclopts](https://github.com/BrianPugh/cyclopts) for CLI parsing. Single entry point `main()` (`nv`, `notes-vault`).
 
 ### Commands (`commands/`)
 
 Each module registers its commands with the Cyclopts app:
 
-- `admin.py` - `defaults`, `index`
+- `admin.py` - `sync`
+- `consumers.py` - `consumers add/list/update/delete`
 - `files.py` - `files add/list/update/delete`
-- `keys.py` - `keys add/list/update/delete`
-- `sensitivity.py` - `sensitivities add/list/update/delete/include`
-- `user.py` - `list`, `get`, `query`
 
 ## Dependencies
 

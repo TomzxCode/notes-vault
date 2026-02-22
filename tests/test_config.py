@@ -8,35 +8,21 @@ def test_load_config_empty(temp_config_dir):
     config = load_config()
     assert config is not None
     assert len(config.files) == 0
-    assert len(config.keys) == 0
-    assert len(config.sensitivities) == 0
+    assert len(config.consumers) == 0
 
 
 def test_save_and_load_config(temp_config_dir, sample_config):
     """Test saving and loading configuration."""
-    # Save config
     save_config(sample_config)
 
-    # Load it back
-    loaded_config = load_config()
+    loaded = load_config()
 
-    assert len(loaded_config.files) == 1
-    assert "mynotes" in loaded_config.files
-    assert loaded_config.files["mynotes"].sensitivity == "private"
+    assert len(loaded.files) == 1
+    assert "mynotes" in loaded.files
 
-    assert len(loaded_config.keys) == 3
-    assert "admin_key" in loaded_config.keys
-    assert "private" in loaded_config.keys["admin_key"].sensitivities
+    assert len(loaded.consumers) == 3
+    assert "public" in loaded.consumers
+    assert r"#public" in loaded.consumers["public"].include_queries
 
-    assert len(loaded_config.sensitivities) == 3
-    assert "private" in loaded_config.sensitivities
-    assert "public" in loaded_config.sensitivities["private"].includes
-
-
-def test_config_defaults(temp_config_dir, sample_config):
-    """Test default configuration values."""
-    save_config(sample_config)
-    loaded_config = load_config()
-
-    assert "sensitivity" in loaded_config.defaults
-    assert loaded_config.defaults["sensitivity"] == "private"
+    assert "no_drafts" in loaded.consumers
+    assert r"#draft" in loaded.consumers["no_drafts"].exclude_queries

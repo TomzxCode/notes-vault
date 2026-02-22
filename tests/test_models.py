@@ -1,53 +1,34 @@
 """Tests for data models."""
 
-from datetime import datetime
-from uuid import uuid4
-
-from notes_vault.models import ApiKey, FileGroup, NoteMetadata, SensitivityLevel
-
-
-def test_sensitivity_level():
-    """Test SensitivityLevel model."""
-    sens = SensitivityLevel(
-        name="private",
-        description="Private notes",
-        query=r"#private",
-        includes={"public", "friends"},
-    )
-    assert sens.name == "private"
-    assert "public" in sens.includes
-    assert len(sens.includes) == 2
+from notes_vault.models import Consumer, FileGroup
 
 
 def test_file_group():
     """Test FileGroup model."""
-    fg = FileGroup(name="notes", path="/path/**/*.md", sensitivity="private")
+    fg = FileGroup(name="notes", path="/path/**/*.md")
     assert fg.name == "notes"
     assert fg.path == "/path/**/*.md"
-    assert fg.sensitivity == "private"
 
 
-def test_api_key():
-    """Test ApiKey model."""
-    key = ApiKey(key_name="test_key", key_hash="abc123", sensitivities={"public", "private"})
-    assert key.key_name == "test_key"
-    assert key.key_hash == "abc123"
-    assert len(key.sensitivities) == 2
-    assert "public" in key.sensitivities
-
-
-def test_note_metadata():
-    """Test NoteMetadata model."""
-    note_uuid = uuid4()
-    note = NoteMetadata(
-        uuid=note_uuid,
-        file_path="/test/note.md",
-        file_group="notes",
-        detected_sensitivities={"private", "public"},
-        last_modified=datetime.now(),
-        last_indexed=datetime.now(),
-        content_hash="abc123",
+def test_consumer():
+    """Test Consumer model."""
+    consumer = Consumer(
+        name="claude",
+        target="~/exports/claude",
+        include_queries=[r"#public", r"#work"],
+        exclude_queries=[r"#draft"],
+        rename=True,
     )
-    assert note.uuid == note_uuid
-    assert len(note.detected_sensitivities) == 2
-    assert "private" in note.detected_sensitivities
+    assert consumer.name == "claude"
+    assert consumer.target == "~/exports/claude"
+    assert r"#public" in consumer.include_queries
+    assert r"#draft" in consumer.exclude_queries
+    assert consumer.rename is True
+
+
+def test_consumer_defaults():
+    """Test Consumer model defaults."""
+    consumer = Consumer(name="test", target="/tmp/test")
+    assert consumer.include_queries == []
+    assert consumer.exclude_queries == []
+    assert consumer.rename is False

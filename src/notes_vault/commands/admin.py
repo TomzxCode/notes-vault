@@ -1,74 +1,78 @@
-"""Admin commands for defaults and indexing."""
+"""Admin commands for syncing."""
 
 from typing import Annotated
 
 import cyclopts
 from rich.console import Console
-from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeElapsedColumn
-from rich.table import Table
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
-from notes_vault.config import load_config, save_config
-from notes_vault.indexer import index_all
-from notes_vault.storage import init_db
+from notes_vault.config import load_config
+from notes_vault.syncer import sync_consumer
 
 console = Console()
 
 
-def defaults(
-    sensitivity: Annotated[
-        str | None, cyclopts.Parameter(help="Set default sensitivity level")
+def sync(
+    consumer: Annotated[
+        str | None, cyclopts.Parameter(help="Consumer name (sync all if omitted)")
+    ] = None,
+    workers: Annotated[
+        int | None, cyclopts.Parameter(help="Number of parallel workers (default: auto)")
     ] = None,
 ):
-    """Show or set default sensitivity level."""
+    """Sync notes to consumer target directories."""
     config = load_config()
+    consumers = config.consumers
 
-    if sensitivity:
-        # Set new default
-        config.defaults["sensitivity"] = sensitivity
-        save_config(config)
-        console.print(f"[green]✓[/green] Default sensitivity set to: {sensitivity}")
-    else:
-        # Show current defaults
-        if not config.defaults:
-            console.print("[yellow]No defaults configured[/yellow]")
+    if consumer:
+        if consumer not in consumers:
+            console.print(f"[red]Error:[/red] Consumer '{consumer}' not found")
             return
+        consumers = {consumer: consumers[consumer]}
 
-        table = Table(title="Default Settings")
-        table.add_column("Setting", style="cyan")
-        table.add_column("Value", style="green")
+    if not consumers:
+        console.print("[yellow]No consumers configured[/yellow]")
+        return
 
-        for key, value in config.defaults.items():
-            table.add_row(key, str(value))
+    for name, c in consumers.items():
+        found_count = 0
 
-        console.print(table)
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        ) as progress:
+            task = progress.add_task(f"[{name}] Scanning...", total=None)
 
+            def on_file_found() -> None:
+                nonlocal found_count
+                found_count += 1
+                progress.update(task, total=found_count)
 
-def index():
-    """Manually trigger indexing of all configured file groups."""
-    init_db()
+            def on_progress(current: int, total: int) -> None:
+                progress.update(
+                    task, description=f"[{name}] Syncing...", completed=current, total=total
+                )
 
-    found_count = 0
+            stats = sync_consumer(
+                name,
+                c,
+                config,
+                on_file_found=on_file_found,
+                progress_callback=on_progress,
+                workers=workers,
+            )
 
-    with Progress(
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Scanning...", total=None)
-
-        def on_file_found() -> None:
-            nonlocal found_count
-            found_count += 1
-            progress.update(task, total=found_count)
-
-        def on_progress(current: int, total: int) -> None:
-            progress.update(task, description="Indexing files...", completed=current, total=total)
-
-        stats = index_all(progress_callback=on_progress, on_file_found=on_file_found)
-
-    console.print("\n[green]Indexing complete![/green]")
-    console.print(f"  Indexed: {stats['indexed']}")
-    console.print(f"  Skipped: {stats['skipped']}")
-    console.print(f"  Errors:  {stats['errors']}")
+        console.print(f"  Exported: {stats['exported']}")
+        console.print(f"  Skipped:  {stats['skipped']}")
+        console.print(f"  Errors:   {stats['errors']}")
