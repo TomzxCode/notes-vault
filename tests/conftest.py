@@ -65,6 +65,7 @@ def sample_config(temp_notes_dir, temp_export_dir):
             target=str(temp_export_dir / "public"),
             include_queries=[r"#public"],
             exclude_queries=[],
+            exclude_paths=[],
             rename=False,
         ),
         "work": Consumer(
@@ -72,6 +73,7 @@ def sample_config(temp_notes_dir, temp_export_dir):
             target=str(temp_export_dir / "work"),
             include_queries=[r"#work", r"#private"],
             exclude_queries=[],
+            exclude_paths=[],
             rename=False,
         ),
         "no_drafts": Consumer(
@@ -79,6 +81,7 @@ def sample_config(temp_notes_dir, temp_export_dir):
             target=str(temp_export_dir / "no_drafts"),
             include_queries=[r"#public"],
             exclude_queries=[r"#draft"],
+            exclude_paths=[],
             rename=False,
         ),
     }

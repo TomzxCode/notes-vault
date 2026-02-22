@@ -59,6 +59,7 @@ def test_sync_no_include_queries_exports_nothing(temp_notes_dir, temp_export_dir
         target=str(temp_export_dir / "empty"),
         include_queries=[],
         exclude_queries=[],
+        exclude_paths=[],
         rename=False,
     )
     stats = sync_consumer("empty", consumer, sample_config)
@@ -73,6 +74,8 @@ def test_sync_rename_uses_uuid_filenames(temp_dir, temp_notes_dir, sample_config
         name="renamed",
         target=str(temp_dir / "renamed"),
         include_queries=[r"#public"],
+        exclude_queries=[],
+        exclude_paths=[],
         rename=True,
     )
     sync_consumer("renamed", consumer, sample_config)
@@ -123,3 +126,39 @@ def test_sync_specific_consumer(temp_config_dir, temp_notes_dir, sample_config):
     assert "public" in results
     assert "work" not in results
     assert "no_drafts" not in results
+
+
+def test_sync_exclude_paths_prevents_export(temp_notes_dir, temp_export_dir, sample_config):
+    """Test that exclude_paths prevents export based on glob patterns."""
+    consumer = Consumer(
+        name="no_private_files",
+        target=str(temp_export_dir / "filtered"),
+        include_queries=[r"#public", r"#private"],
+        exclude_queries=[],
+        exclude_paths=["*private*"],
+        rename=False,
+    )
+    sync_consumer("no_private_files", consumer, sample_config)
+
+    exported = {f.name for f in Path(consumer.target).glob("*.md")}
+    assert "public.md" in exported
+    assert "mixed.md" in exported
+    assert "draft.md" in exported
+    assert "private.md" not in exported
+
+
+def test_sync_exclude_paths_with_extension(temp_notes_dir, temp_export_dir, sample_config):
+    """Test that exclude_paths filters by file extension."""
+    consumer = Consumer(
+        name="markdown_only",
+        target=str(temp_export_dir / "md_only"),
+        include_queries=[r"."],  # Match everything
+        exclude_queries=[],
+        exclude_paths=["*.txt"],
+        rename=False,
+    )
+    sync_consumer("markdown_only", consumer, sample_config)
+
+    exported = {f.name for f in Path(consumer.target).glob("*")}
+    assert "public.md" in exported
+    assert len([f for f in Path(consumer.target).glob("*.txt")]) == 0

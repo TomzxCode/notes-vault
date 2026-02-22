@@ -17,6 +17,7 @@ class Consumer(BaseModel):
     target: str
     include_queries: list[str] = Field(default_factory=list)
     exclude_queries: list[str] = Field(default_factory=list)
+    exclude_paths: list[str] = Field(default_factory=list)
     rename: bool = False
 
 

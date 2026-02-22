@@ -123,7 +123,7 @@ nv files delete <name>
 Add a new consumer.
 
 ```bash
-nv consumers add <name> <target> [--include-queries <patterns>] [--exclude-queries <patterns>] [--rename]
+nv consumers add <name> <target> [--include-queries <patterns>] [--exclude-queries <patterns>] [--exclude-paths <patterns>] [--rename]
 ```
 
 **Arguments:**
@@ -139,6 +139,7 @@ nv consumers add <name> <target> [--include-queries <patterns>] [--exclude-queri
 |--------|-------------|
 | `--include-queries PATTERNS` | Comma-separated regex patterns; at least one must match for export |
 | `--exclude-queries PATTERNS` | Comma-separated regex patterns; any match prevents export |
+| `--exclude-paths PATTERNS` | Comma-separated glob patterns tested against the file path; any match prevents export |
 | `--rename` | Rename exported files to deterministic UUIDs (default: false) |
 
 **Example:**
@@ -149,6 +150,11 @@ nv consumers add work-assistant "~/exports/work" \
   --include-queries "#work,#project" \
   --exclude-queries "#private" \
   --rename
+
+# Exclude files in an archive folder
+nv consumers add public "~/exports/public" \
+  --include-queries "#public" \
+  --exclude-paths "*/archive/*,*/drafts/*"
 
 # Personal assistant that sees all notes
 nv consumers add personal "~/exports/personal" --include-queries ".*"
@@ -171,7 +177,7 @@ nv consumers list
 Update an existing consumer.
 
 ```bash
-nv consumers update <name> [--target <dir>] [--include-queries <patterns>] [--exclude-queries <patterns>] [--rename/--no-rename]
+nv consumers update <name> [--target <dir>] [--include-queries <patterns>] [--exclude-queries <patterns>] [--exclude-paths <patterns>] [--rename/--no-rename]
 ```
 
 **Arguments:**
@@ -187,6 +193,7 @@ nv consumers update <name> [--target <dir>] [--include-queries <patterns>] [--ex
 | `--target DIR` | New target directory |
 | `--include-queries PATTERNS` | New comma-separated include patterns (replaces existing) |
 | `--exclude-queries PATTERNS` | New comma-separated exclude patterns (replaces existing) |
+| `--exclude-paths PATTERNS` | New comma-separated glob path patterns (replaces existing) |
 | `--rename / --no-rename` | Enable or disable UUID renaming |
 
 ---

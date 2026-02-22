@@ -6,6 +6,7 @@ import threading
 import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from fnmatch import fnmatch
 from pathlib import Path
 
 import structlog
@@ -29,6 +30,15 @@ def _matches_any(content: str, patterns: list[str]) -> bool:
         if pattern not in _pattern_cache:
             _pattern_cache[pattern] = re.compile(pattern, re.IGNORECASE)
         if _pattern_cache[pattern].search(content):
+            return True
+    return False
+
+
+def _matches_path_glob(file_path: Path, patterns: list[str]) -> bool:
+    """Return True if file_path matches any of the given glob patterns."""
+    path_str = str(file_path)
+    for pattern in patterns:
+        if fnmatch(path_str, pattern) or fnmatch(file_path.name, pattern):
             return True
     return False
 
@@ -127,6 +137,9 @@ def sync_consumer(
     dest_lock = threading.Lock()
 
     def _process(file_path: Path) -> str:
+        if _matches_path_glob(file_path, consumer.exclude_paths):
+            return "skipped"
+
         try:
             content = file_path.read_text(encoding="utf-8")
         except Exception as e:

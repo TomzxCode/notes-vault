@@ -21,6 +21,9 @@ def add(
     exclude_queries: Annotated[
         str, cyclopts.Parameter(help="Comma-separated regex patterns to exclude files")
     ] = "",
+    exclude_paths: Annotated[
+        str, cyclopts.Parameter(help="Comma-separated glob patterns to exclude file paths")
+    ] = "",
     rename: Annotated[
         bool, cyclopts.Parameter(help="Rename exported files to deterministic UUIDs")
     ] = False,
@@ -34,11 +37,13 @@ def add(
 
     include_list = [q.strip() for q in include_queries.split(",") if q.strip()]
     exclude_list = [q.strip() for q in exclude_queries.split(",") if q.strip()]
+    exclude_paths_list = [p.strip() for p in exclude_paths.split(",") if p.strip()]
     config.consumers[name] = Consumer(
         name=name,
         target=target,
         include_queries=include_list,
         exclude_queries=exclude_list,
+        exclude_paths=exclude_paths_list,
         rename=rename,
     )
     save_config(config)
@@ -47,6 +52,7 @@ def add(
     console.print(f"  Target:          {target}")
     console.print(f"  Include queries: {', '.join(include_list) or '-'}")
     console.print(f"  Exclude queries: {', '.join(exclude_list) or '-'}")
+    console.print(f"  Exclude paths:   {', '.join(exclude_paths_list) or '-'}")
     console.print(f"  Rename:          {rename}")
 
 
@@ -63,6 +69,7 @@ def list_consumers():
     table.add_column("Target", style="blue")
     table.add_column("Include Queries", style="green")
     table.add_column("Exclude Queries", style="red")
+    table.add_column("Exclude Paths", style="magenta")
     table.add_column("Rename", style="yellow")
 
     for name, consumer in config.consumers.items():
@@ -71,6 +78,7 @@ def list_consumers():
             consumer.target,
             ", ".join(consumer.include_queries) or "-",
             ", ".join(consumer.exclude_queries) or "-",
+            ", ".join(consumer.exclude_paths) or "-",
             str(consumer.rename),
         )
 
@@ -85,6 +93,9 @@ def update(
     ] = None,
     exclude_queries: Annotated[
         str | None, cyclopts.Parameter(help="Comma-separated regex patterns to exclude files")
+    ] = None,
+    exclude_paths: Annotated[
+        str | None, cyclopts.Parameter(help="Comma-separated glob patterns to exclude file paths")
     ] = None,
     rename: Annotated[
         bool | None, cyclopts.Parameter(help="Rename exported files to UUIDs")
@@ -106,6 +117,10 @@ def update(
     if exclude_queries is not None:
         config.consumers[name].exclude_queries = [
             q.strip() for q in exclude_queries.split(",") if q.strip()
+        ]
+    if exclude_paths is not None:
+        config.consumers[name].exclude_paths = [
+            p.strip() for p in exclude_paths.split(",") if p.strip()
         ]
     if rename is not None:
         config.consumers[name].rename = rename
