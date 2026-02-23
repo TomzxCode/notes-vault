@@ -52,15 +52,11 @@ nav:
   - CLI Reference: cli.md
   - Development: development.md
   - Specifications:
-    - Indexing: spec/indexing.md
-    - Storage: spec/storage.md
-    - Query: spec/query.md
-    - Sensitivity Detection: spec/sensitivity-detection.md
-    - Sensitivity Levels: spec/sensitivity-levels.md
     - Access Control: spec/access-control.md
-    - File Groups: spec/file-groups.md
-    - API Keys: spec/api-keys.md
     - Configuration: spec/configuration.md
+    - Consumers: spec/consumers.md
+    - File Groups: spec/file-groups.md
+    - Syncer: spec/syncer.md
 
 markdown_extensions:
   - pymdownx.highlight:
