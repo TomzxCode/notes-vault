@@ -48,6 +48,11 @@ jobs:
         run: |
           rm -rf docs
           mv site docs
+      - name: Clean up prior to upload
+        run: |
+          rm -rf .cache spec src tests
+          # Delete all files in the current directory (which is the root of the repository)
+          find . -maxdepth 1 -type f -delete
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
