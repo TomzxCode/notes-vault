@@ -1,63 +1,53 @@
 # Notes Vault
 
-A privacy-sensitive notes sync CLI tool with pattern-based access control.
+A privacy-sensitive notes sync CLI tool with regex-based access control.
 
 ## Overview
 
-Notes Vault (`notes-vault` or `nv`) exports your notes to consumer-specific directories based on sensitivity rules. Each consumer (e.g. an LLM, a work assistant) gets its own target directory containing only the notes it is allowed to see. Sensitivity is detected by scanning note content against configurable regex patterns.
+Notes Vault (`notes-vault` or `nv`) exports your notes to consumer-specific directories based on content matching rules. Each consumer (e.g. an LLM, a work assistant) gets its own target directory containing only the notes it is allowed to see. Access is controlled by configurable regex patterns matched against file content.
 
 ## Features
 
-- **Pattern-based sensitivity detection**: Classify notes using regex patterns matched against file content
-- **Hierarchical access**: Sensitivity levels can include other levels (e.g. `work` includes `public`)
-- **Consumer directories**: Each consumer gets a clean export of only its accessible notes
+- **Regex-based filtering**: Include or exclude files based on regex patterns matched against file content
+- **Path exclusions**: Skip files by glob patterns matched against their paths
+- **Consumer directories**: Each consumer gets a clean export of only its matching notes
 - **Optional UUID renaming**: Rename exported files to deterministic UUIDs to hide filenames from consumers
+- **Directory structure preservation**: Exported files maintain their original directory hierarchy
+- **Parallel scanning**: Multi-threaded file discovery and export for large vaults
 - **File group management**: Organize source notes using glob patterns
 - **YAML configuration**: Human-readable, hand-editable configuration
 
 ## Installation
 
 ```bash
-# Install with uv
 uv tool install https://github.com/TomzxCode/notes-vault.git
 ```
 
 ## Quick Start
 
-### 1. Configure Sensitivity Levels
-
-```bash
-# Define sensitivity levels
-nv sensitivities add private --description "Private notes" --query "#private"
-nv sensitivities add work --description "Work notes" --query "#work"
-nv sensitivities add public --description "Public notes" --query "#public"
-
-# Set up access hierarchy (private includes work and public)
-nv sensitivities include private --include-level work
-nv sensitivities include private --include-level public
-nv sensitivities include work --include-level public
-```
-
-### 2. Add File Groups
+### 1. Add File Groups
 
 ```bash
 # Add a file group pointing to your notes
-nv files add mynotes --path "~/Documents/notes/**/*.md" --sensitivity private
+nv files add mynotes --path "~/Documents/notes/**/*.md"
 ```
 
-The `--sensitivity` flag sets the fallback sensitivity for files with no matching patterns.
-
-### 3. Add Consumers
+### 2. Add Consumers
 
 ```bash
-# A work assistant that can see work and public notes
-nv consumers add work-assistant --target "~/exports/work" --sensitivities work
+# A work assistant that sees notes tagged #work, but not #private
+nv consumers add work-assistant \
+  --target "~/exports/work" \
+  --include-queries "#work" \
+  --exclude-queries "#private"
 
-# A personal assistant with full access, files renamed to UUIDs
-nv consumers add claude --target "~/exports/claude" --sensitivities private --rename
+# A personal assistant with access to all notes, files renamed to UUIDs
+nv consumers add claude \
+  --target "~/exports/claude" \
+  --rename
 ```
 
-### 4. Sync
+### 3. Sync
 
 ```bash
 # Sync all consumers
@@ -65,6 +55,9 @@ nv sync
 
 # Sync a specific consumer
 nv sync claude
+
+# Sync with explicit parallelism
+nv sync --workers 8
 ```
 
 Each sync deletes and recreates the target directory with the current matching files.
@@ -74,59 +67,44 @@ Each sync deletes and recreates the target directory with the current matching f
 Stored at `~/.config/notes-vault/config.yaml` (or `$XDG_CONFIG_HOME/notes-vault/config.yaml`).
 
 ```yaml
-defaults:
-  sensitivity: private
-
 files:
-  mynotes:
+  my-notes:
     path: "~/Documents/notes/**/*.md"
-    sensitivity: private
-
-sensitivities:
-  private:
-    description: "Private notes"
-    query: "#private"
-    includes: []
-  work:
-    description: "Work notes"
-    query: "#work"
-    includes:
-      - public
-  public:
-    description: "Public notes"
-    query: "#public"
-    includes: []
 
 consumers:
   claude:
+    name: claude
     target: "~/exports/claude"
-    sensitivities:
-      - private
-    rename: true       # optional: rename files to deterministic UUIDs
+    include_queries: []
+    exclude_queries: []
+    exclude_paths: []
+    rename: true
   work-assistant:
+    name: work-assistant
     target: "~/exports/work"
-    sensitivities:
-      - work
+    include_queries:
+      - "#work"
+    exclude_queries:
+      - "#private"
+    exclude_paths:
+      - "*/drafts/*"
     rename: false
 ```
 
 ## How It Works
 
-### Sensitivity Detection
+### File Matching
 
-1. Each file is scanned against the regex `query` patterns defined in `sensitivities`
-2. All matching sensitivities are recorded for that file
-3. If no patterns match, the file group's `sensitivity` is used; if unset, the global `defaults.sensitivity` applies
+For each file discovered from the configured file groups, the syncer applies the following checks in order:
 
-### Access Control
+1. **Path exclusion**: if the file path matches any `exclude_paths` glob, the file is skipped
+2. **Content exclusion**: if the file content matches any `exclude_queries` regex, the file is skipped
+3. **Content inclusion**: if `include_queries` is non-empty and the content does not match any pattern, the file is skipped
+4. Files passing all checks are copied to the consumer's target directory
 
-A file is exported to a consumer if any of its detected sensitivities intersects with the consumer's allowed set, after expanding via `includes` relationships.
+### Directory Structure
 
-Example: if `work` includes `public`, a consumer with `work` access sees both `#work` and `#public` notes.
-
-### UUID Renaming
-
-When `rename: true`, files are renamed using a deterministic UUID (UUID5) derived from the file path. The same file always gets the same UUID across syncs. This hides filename information from the consumer.
+When `rename` is false, exported files preserve their original directory structure relative to the file group's base path. When `rename` is true, files are renamed using a deterministic UUID5 derived from the absolute file path - the same file always gets the same UUID across syncs.
 
 ### Sync Behaviour
 
@@ -137,57 +115,33 @@ When `rename: true`, files are renamed using a deterministic UUID (UUID5) derive
 ### Sync
 
 ```bash
-nv sync              # sync all consumers
-nv sync <consumer>   # sync one consumer
+nv sync                      # sync all consumers
+nv sync <consumer>           # sync one consumer
+nv sync --workers <n>        # sync with explicit worker count
 ```
 
 ### File Group Management
 
 ```bash
-# Add a file group
-nv files add <name> --path <glob> --sensitivity <level>
-# List file groups
+nv files add <name> --path <glob>
 nv files list
-
-# Update a file group
-nv files update <name> [--path <glob>] [--sensitivity <level>]
-
-# Delete a file group
+nv files update <name> [--path <glob>]
 nv files delete <name>
 ```
 
 ### Consumer Management
 
 ```bash
-nv consumers add <name> --target <dir> --sensitivities <level1,level2,...> [--rename]
+nv consumers add <name> \
+  --target <dir> \
+  [--include-queries <pattern1,pattern2,...>] \
+  [--exclude-queries <pattern1,pattern2,...>] \
+  [--exclude-paths <glob1,glob2,...>] \
+  [--rename]
+
 nv consumers list
-nv consumers update <name> [--target <dir>] [--sensitivities <levels>] [--rename/--no-rename]
+nv consumers update <name> [--target <dir>] [--include-queries <...>] [--exclude-queries <...>] [--exclude-paths <...>] [--rename/--no-rename]
 nv consumers delete <name>
-```
-
-### Sensitivity Level Management
-
-```bash
-# Add a sensitivity level
-nv sensitivities add <name> --description <desc> --query <regex>
-# List sensitivity levels
-nv sensitivities list
-
-# Update a sensitivity level
-nv sensitivities update <name> [--description <desc>] [--query <regex>]
-
-# Delete a sensitivity level
-nv sensitivities delete <name>
-
-# Add include relationship
-nv sensitivities include <name> --include-level <other>
-```
-
-### Defaults
-
-```bash
-nv defaults                        # show current default sensitivity
-nv defaults --sensitivity <level>  # set default sensitivity
 ```
 
 ## Development
@@ -196,18 +150,16 @@ nv defaults --sensitivity <level>  # set default sensitivity
 # Run all tests
 uv run pytest -v
 
-# Lint code
+# Lint and format
 uv run ruff check src tests
-# Format code
 uv run ruff format src tests
 ```
 
 ## Architecture
 
-- **models.py**: Pydantic data models
+- **models.py**: Pydantic data models (`FileGroup`, `Consumer`, `Config`)
 - **config.py**: YAML configuration management
-- **sensitivity.py**: Pattern detection logic
-- **syncer.py**: File discovery, sensitivity matching, and export
+- **syncer.py**: File discovery, regex/glob matching, and parallel export
 - **cli.py**: CLI entry point (Cyclopts)
 - **commands/**: CLI command implementations
 
