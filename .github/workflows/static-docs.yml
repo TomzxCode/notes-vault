@@ -37,6 +37,11 @@ jobs:
         run: |
           uv venv $VIRTUAL_ENV
           uv sync --active --locked --dev
+      # Zensical doesn't support symlinks yet (as of 0.0.23), so we need to copy the spec files instead of using a symlink
+      - name: Copy spec files (replace symlink)
+        run: |
+          rm -f docs/spec
+          cp -r spec docs/spec
       - name: Build zensical documentation
         run: uv run --active zensical build
       - name: Replace docs with zensical site
