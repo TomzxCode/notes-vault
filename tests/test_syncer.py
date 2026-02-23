@@ -162,3 +162,41 @@ def test_sync_exclude_paths_with_extension(temp_notes_dir, temp_export_dir, samp
     exported = {f.name for f in Path(consumer.target).glob("*")}
     assert "public.md" in exported
     assert len([f for f in Path(consumer.target).glob("*.txt")]) == 0
+
+
+def test_sync_preserves_directory_structure_when_rename_false(temp_dir, sample_config):
+    """Test that rename=False preserves source directory structure."""
+    # Create notes with nested structure
+    notes_dir = temp_dir / "nested_notes"
+    notes_dir.mkdir(parents=True, exist_ok=True)
+    subdir = notes_dir / "subdir"
+    subdir.mkdir(parents=True, exist_ok=True)
+
+    (notes_dir / "root.md").write_text("Root #public content")
+    (subdir / "nested.md").write_text("Nested #public content")
+
+    # Update config to use the nested notes
+    from notes_vault.models import FileGroup
+    from notes_vault.syncer import sync_consumer
+
+    sample_config.files = {"nested": FileGroup(name="nested", path=f"{notes_dir}/**/*.md")}
+
+    consumer = Consumer(
+        name="structured",
+        target=str(temp_dir / "structured_export"),
+        include_queries=[r"#public"],
+        exclude_queries=[],
+        exclude_paths=[],
+        rename=False,
+    )
+    sync_consumer("structured", consumer, sample_config)
+
+    target = Path(consumer.target)
+
+    # Files should be in their original subdirectory structure
+    assert (target / "root.md").exists()
+    assert (target / "subdir" / "nested.md").exists()
+
+    # Verify content
+    assert (target / "root.md").read_text() == "Root #public content"
+    assert (target / "subdir" / "nested.md").read_text() == "Nested #public content"

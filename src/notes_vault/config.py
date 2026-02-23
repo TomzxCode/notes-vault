@@ -51,10 +51,7 @@ def save_config(config: Config) -> None:
     config_dir.mkdir(parents=True, exist_ok=True)
 
     data = {
-        "files": {
-            name: {"path": fg.path}
-            for name, fg in config.files.items()
-        },
+        "files": {name: {"path": fg.path} for name, fg in config.files.items()},
         "consumers": {
             name: {
                 "target": consumer.target,

@@ -156,9 +156,35 @@ def sync_consumer(
             dest = target / (_file_uuid(file_path) + file_path.suffix)
             shutil.copy2(file_path, dest)
         else:
-            with dest_lock:
-                dest = _unique_dest(target, file_path)
-                shutil.copy2(file_path, dest)
+            # Preserve source directory structure relative to source files' base paths
+            relative_path = None
+            for fg in config.files.values():
+                base = Path(fg.path).expanduser()
+                if "**" in str(base):
+                    base = Path(str(base).split("**")[0])
+                try:
+                    relative_path = file_path.relative_to(base.resolve())
+                    break
+                except ValueError:
+                    continue
+
+            if relative_path:
+                dest_dir = target / relative_path.parent
+                with dest_lock:
+                    dest_dir.mkdir(parents=True, exist_ok=True)
+                    dest = dest_dir / file_path.name
+                    if dest.exists():
+                        stem = file_path.stem
+                        suffix = file_path.suffix
+                        i = 1
+                        while dest.exists():
+                            dest = dest_dir / f"{stem}_{i}{suffix}"
+                            i += 1
+                    shutil.copy2(file_path, dest)
+            else:
+                with dest_lock:
+                    dest = _unique_dest(target, file_path)
+                    shutil.copy2(file_path, dest)
 
         logger.info("Exported", src=str(file_path), dest=str(dest), consumer=consumer_name)
         return "exported"
